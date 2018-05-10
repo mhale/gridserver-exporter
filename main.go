@@ -38,13 +38,13 @@ Examples:
 
 	var (
 		listenAddress = kingpin.Flag("listen-address", "Address to listen on for web interface and telemetry.").Short('l').Default(":9336").String()
-		metricsPath   = kingpin.Flag("telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
+		metricsPath   = kingpin.Flag("metrics-path", "Path under which to expose metrics.").Default("/metrics").String()
 		url           = kingpin.Flag("url", "URL for reporting database or Web Services (SOAP).").PlaceHolder("URL").Short('u').Required().String()
 		tlsVerify     = kingpin.Flag("tls-verify", "Flag that enables TLS certificate verification for the Web Services URL.").Default("true").Bool()
 		schema        = kingpin.Flag("schema", "Schema name for reporting database.").PlaceHolder("SCHEMA").Short('s').String()
 		timeout       = kingpin.Flag("timeout", "Timeout for fetching metrics in seconds.").Short('t').Default("5s").Duration()
 		once          = kingpin.Flag("once", "Fetch metrics once, then exit.").Default("false").Bool()
-		pidFile       = kingpin.Flag("pidfile", pidFileHelpText).PlaceHolder("FILENAME").Short('p').String()
+		pidFile       = kingpin.Flag("pid-file", pidFileHelpText).PlaceHolder("FILENAME").Short('p').String()
 	)
 
 	log.AddFlags(kingpin.CommandLine)
