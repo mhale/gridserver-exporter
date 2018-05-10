@@ -185,7 +185,14 @@ func (e *Exporter) scrape() {
 	}
 	e.up.Set(1)
 
-	log.With("elapsed", elapsed).Info("Scrape succeeded")
+	log.With("elapsed", elapsed).
+		With("busyEngines", grid.BusyEngines).
+		With("drivers", grid.Drivers).
+		With("servicesRunning", grid.ServicesRunning).
+		With("tasksPending", grid.TasksPending).
+		With("tasksRunning", grid.TasksRunning).
+		With("totalEngines", grid.TotalEngines).
+		Info("Scrape succeeded")
 
 	e.gridMetrics["busy_engines"].Set(float64(grid.BusyEngines))
 	e.gridMetrics["total_engines"].Set(float64(grid.TotalEngines))

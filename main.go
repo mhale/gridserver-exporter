@@ -63,12 +63,20 @@ Examples:
 
 	if *once == true {
 		start := time.Now()
-		_, _, err = exporter.Fetch()
+		grid, _, err := exporter.Fetch()
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).Fatalf("Fetch failed: %s", err)
+			log.With("elapsed", elapsed).Fatalf("Scrape failed: %s", err)
+			return
 		}
-		log.With("elapsed", elapsed).Info("Fetch succeeded")
+		log.With("elapsed", elapsed).
+			With("busyEngines", grid.BusyEngines).
+			With("drivers", grid.Drivers).
+			With("servicesRunning", grid.ServicesRunning).
+			With("tasksPending", grid.TasksPending).
+			With("tasksRunning", grid.TasksRunning).
+			With("totalEngines", grid.TotalEngines).
+			Info("Scrape succeeded")
 		return
 	}
 
