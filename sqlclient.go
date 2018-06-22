@@ -154,7 +154,8 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		log.With("elapsed", elapsed).Debug("SQL query succeeded")
 
 		for rows.Next() {
-			var brokerID, brokerURL string
+			var brokerID int
+			var brokerURL string
 			var ts time.Time
 			r := BrokerReport{}
 
