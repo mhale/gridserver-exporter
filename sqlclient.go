@@ -16,34 +16,27 @@ import (
 
 const (
 	queryTmpl = `
-		SELECT
-			latest.broker_id,
-			broker_url,
-			broker_name,
-			num_busy_engines,
-			num_total_engines,
-			num_drivers,
-			uptime_minutes,
-			num_jobs_running,
-			num_tasks_pending,
-			time_stamp
-		FROM
-		(
+		WITH latest AS (
 			SELECT
 				broker_id,
-				num_busy_engines,
-				num_total_engines,
-				num_drivers,
-				uptime_minutes,
-				num_jobs_running,
-				num_tasks_pending,
-				time_stamp,
-				MAX(time_stamp) OVER (PARTITION BY broker_id) max_time_stamp
+				MAX(time_stamp) AS max_time_stamp
 			FROM %[1]s.broker_stats
-		) latest
-		LEFT OUTER JOIN %[1]s.brokers ON %[1]s.brokers.broker_id = latest.broker_id
-		WHERE time_stamp = max_time_stamp 
-			AND %[1]s.brokers.broker_id IS NOT NULL
+			GROUP BY broker_id )
+		SELECT
+			latest.broker_id,
+			brokers.broker_url,
+			brokers.broker_name,
+			broker_stats.num_busy_engines,
+			broker_stats.num_total_engines,
+			broker_stats.num_drivers,
+			broker_stats.uptime_minutes,
+			broker_stats.num_jobs_running,
+			broker_stats.num_tasks_pending,
+			latest.max_time_stamp AS time_stamp
+		FROM latest
+		LEFT JOIN %[1]s.broker_stats ON %[1]s.broker_stats.broker_id = latest.broker_id
+			AND %[1]s.broker_stats.time_stamp = latest.max_time_stamp
+		LEFT JOIN %[1]s.brokers ON %[1]s.brokers.broker_id = latest.broker_id
 		`
 )
 
