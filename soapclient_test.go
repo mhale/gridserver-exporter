@@ -120,6 +120,21 @@ func TestNewSOAPClient(t *testing.T) {
 			&SOAPClient{"http://director:8080/livecluster/webservices", "user", "pass", &tls.Config{InsecureSkipVerify: true}, 5 * time.Second},
 			false,
 		},
+		{"SlashPath",
+			args{"http://user:pass@director:1234/", false, 5 * time.Second},
+			&SOAPClient{"http://director:1234/livecluster/webservices", "user", "pass", &tls.Config{InsecureSkipVerify: true}, 5 * time.Second},
+			false,
+		},
+		{"LiveclusterWithSlash",
+			args{"http://user:pass@director:1234/livecluster/", false, 5 * time.Second},
+			&SOAPClient{"http://director:1234/livecluster/webservices", "user", "pass", &tls.Config{InsecureSkipVerify: true}, 5 * time.Second},
+			false,
+		},
+		{"FullPathWithSlash",
+			args{"http://user:pass@director:1234/livecluster/webservices/", false, 5 * time.Second},
+			&SOAPClient{"http://director:1234/livecluster/webservices", "user", "pass", &tls.Config{InsecureSkipVerify: true}, 5 * time.Second},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
