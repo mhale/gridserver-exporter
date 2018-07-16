@@ -18,7 +18,7 @@ gridserver-exporter -h
 
 ## Usage
 
-There are three supported sources of reporting information: the GridServer reporting database, the Web Services API, and a mock data source that returns random values. The source type is specified by the schema in the `url` parameter. 
+There are three supported sources of reporting information: the GridServer reporting database, the Web Services API, and a mock data source that returns random values. The source type is specified by the schema in the `url` parameter.
 
 To use the reporting database:
 
@@ -53,15 +53,15 @@ gridserver-exporter -u oracle://username:password@host/sid -s schema
 
 #### Oracle
 
-The SQL Server support uses the [ora](https://github.com/rana/ora) package.
+The Oracle support uses the [goracle](https://github.com/go-goracle/goracle) package.
 
-Note that the username & password are colon-separated in the "url" parameter, not slash-separated as in the ora package documentation.
+Note that the username & password are colon-separated in the "url" parameter, not slash-separated as in the goracle package documentation.
 
 ```bash
 gridserver-exporter -u oracle://username:password@host/sid
 ```
 
-For Oracle specific options, see the [ora Readme file](https://github.com/rana/ora/blob/master/README.md).
+For Oracle specific options, see the [goracle Readme file](https://github.com/go-goracle/goracle/blob/master/README.md).
 
 #### SQL Server
 
@@ -74,7 +74,7 @@ For SQL Server specific options, see the [go-mssqldb Readme file](https://github
 
 #### PostgreSQL
 
-The PostgreSQL support uses the [pq](https://github.com/lib/pq) package, which enables TLS by default. If the PostgreSQL server does not use TLS, it can be disabled with the `sslmode` query parameter. 
+The PostgreSQL support uses the [pq](https://github.com/lib/pq) package, which enables TLS by default. If the PostgreSQL server does not use TLS, it can be disabled with the `sslmode` query parameter.
 
 ```bash
 gridserver-exporter -u postgres://username:password@host/databasename?sslmode=disable
@@ -85,7 +85,7 @@ For PostgreSQL specific options, see the [pq package documentation](https://godo
 ### GridServer Web Services API
 
 The GridServer Web Services API can be accessed over HTTP or HTTPS. The URL supplied must specify the Director, as Brokers do not support the BrokerAdmin service.
- 
+
 ```bash
 gridserver-exporter -u http://username:password@host[:port][/path]
 ```
@@ -106,7 +106,7 @@ gridserver-exporter -u mock://
 
 ### Building
 
-The ora package has installation requirements: installing the [Oracle Instant Client](http://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) Basic and SDK packages, and [configuring them with pkg-config](https://github.com/rana/ora#installation).
+The goracle package depends on [ODPI](https://github.com/oracle/odpi), which has [installation requirements](https://oracle.github.io/odpi/doc/installation.html).
 
 The package dependencies can be satisfied with:
 
@@ -116,7 +116,7 @@ go get github.com/lib/pq
 go get github.com/prometheus/client_golang/prometheus
 go get github.com/sirupsen/logrus
 go get gopkg.in/alecthomas/kingpin.v2
-go get gopkg.in/rana/ora.v4
+go get gopkg.in/goracle.v2
 ```
 
 The compile-time version information can be set with `ldflags`:

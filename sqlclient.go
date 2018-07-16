@@ -11,7 +11,7 @@ import (
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/common/log"
-	_ "gopkg.in/rana/ora.v4"
+	_ "gopkg.in/goracle.v2"
 )
 
 const (
@@ -94,7 +94,7 @@ func NewSQLClient(uri string, schema string, timeout time.Duration) (*SQLClient,
 		if len(schema) == 0 {
 			schema = u.User.Username() // Default schema on Oracle is the username
 		}
-		driver = "ora"
+		driver = "goracle"
 		// Oracle DSNs look like: user/pass@host:port/sid - note the first slash
 		password, _ := u.User.Password()
 		dsn = fmt.Sprintf("%s/%s@%s:%s%s", u.User.Username(), password, u.Hostname(), u.Port(), u.Path)
