@@ -94,22 +94,23 @@ the availability of /proc.`
 	if *pidFile != "" {
 		if _, err := procfs.NewStat(); err != nil {
 			log.Warn("Process metrics requested but not supported on this system")
+		} else {
+			procExporter := prometheus.NewProcessCollectorPIDFn(
+				func() (int, error) {
+					content, err := ioutil.ReadFile(*pidFile)
+					if err != nil {
+						log.Errorf("Can't read PID file: %s", err)
+						return 0, fmt.Errorf("Can't read PID file: %s", err)
+					}
+					value, err := strconv.Atoi(strings.TrimSpace(string(content)))
+					if err != nil {
+						log.Errorf("Can't parse PID file: %s", err)
+						return 0, fmt.Errorf("Can't parse PID file: %s", err)
+					}
+					return value, nil
+				}, namespace)
+			prometheus.MustRegister(procExporter)
 		}
-
-		// Set up process metric collection if supported by the runtime.
-		procExporter := prometheus.NewProcessCollectorPIDFn(
-			func() (int, error) {
-				content, err := ioutil.ReadFile(*pidFile)
-				if err != nil {
-					return 0, fmt.Errorf("Can't read PID file: %s", err)
-				}
-				value, err := strconv.Atoi(strings.TrimSpace(string(content)))
-				if err != nil {
-					return 0, fmt.Errorf("Can't parse PID file: %s", err)
-				}
-				return value, nil
-			}, namespace)
-		prometheus.MustRegister(procExporter)
 	}
 
 	log.Infoln("Listening on", *listenAddress)
