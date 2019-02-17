@@ -116,5 +116,6 @@ the availability of /proc.`
             </body>
             </html>`))
 	})
+	http.Handle("/favicon.ico", http.NotFoundHandler())
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
