@@ -28,13 +28,10 @@ Examples:
 
 `
 	const pidFileHelpText = `Path to GridServer Manager PID file.
-
-	If provided, the standard process metrics get exported for the Manager
-	process, prefixed with 'gridserver_process_...'. The gridserver_process exporter
-	needs to have read access to files owned by the Manager process. Depends on
-	the availability of /proc.
-
-	https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics.`
+If provided, the standard process metrics get exported for the Manager
+process, prefixed with 'gridserver_process_...'. The gridserver_process exporter
+needs to have read access to files owned by the Manager process. Depends on
+the availability of /proc.`
 
 	var (
 		listenAddress = kingpin.Flag("listen-address", "Address to listen on for web interface and telemetry.").Short('l').Default(":9343").Envar("GRIDSERVER_EXPORTER_LISTEN_ADDRESS").String()
