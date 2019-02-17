@@ -69,6 +69,7 @@ the availability of /proc.`
 		log.Fatalf("Start failed: %s", err)
 	}
 
+	// Fetch statistics once and exit if requested.
 	if *once == true {
 		start := time.Now()
 		grid, _, err := exporter.Fetch()
@@ -91,6 +92,7 @@ the availability of /proc.`
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(version.NewCollector("gridserver_exporter"))
 
+	// Configure process metric collection if supported by the runtime.
 	if *pidFile != "" {
 		if _, err := procfs.NewStat(); err != nil {
 			log.Warn("Process metrics requested but not supported on this system")
@@ -113,7 +115,7 @@ the availability of /proc.`
 		}
 	}
 
-	log.Infoln("Listening on", *listenAddress)
+	// Configure web server to be both browser and Prometheus friendly.
 	http.Handle(*metricsPath, prometheus.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -159,5 +161,7 @@ the availability of /proc.`
             </html>`))
 	})
 	http.Handle("/favicon.ico", http.NotFoundHandler())
+
+	log.Infoln("Listening on", *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
