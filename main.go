@@ -42,13 +42,24 @@ the availability of /proc.`
 		timeout       = kingpin.Flag("timeout", "Timeout for fetching metrics in seconds.").Short('t').Default("5s").Envar("GRIDSERVER_EXPORTER_TIMEOUT").Duration()
 		once          = kingpin.Flag("once", "Fetch metrics once, then exit.").Default("false").Envar("GRIDSERVER_EXPORTER_ONCE").Bool()
 		pidFile       = kingpin.Flag("pid-file", pidFileHelpText).PlaceHolder("FILENAME").Short('p').Envar("GRIDSERVER_EXPORTER_PID_FILE").String()
+		logLevel      = kingpin.Flag("log-level", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]").Default("info").Envar("GRIDSERVER_EXPORTER_LOG_LEVEL").String()
+		logFormat     = kingpin.Flag("log-format", `Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true"`).Default("logger:stderr").Envar("GRIDSERVER_EXPORTER_LOG_FORMAT").String()
 	)
 
-	log.AddFlags(kingpin.CommandLine)
 	kingpin.Version(version.Print("gridserver-exporter"))
 	kingpin.CommandLine.Help = helpText
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
+
+	err := log.Base().SetFormat(*logFormat)
+	if err != nil {
+		log.Fatalf("Invalid log format: %s", *logFormat)
+	}
+
+	err = log.Base().SetLevel(*logLevel)
+	if err != nil {
+		log.Fatalf("Invalid log level: %s", *logLevel)
+	}
 
 	log.Infoln("Starting GridServer Exporter", version.Info())
 	log.Infoln("Build context", version.BuildContext())
