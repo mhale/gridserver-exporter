@@ -115,6 +115,25 @@ the availability of /proc.`
 	log.Infoln("Listening on", *listenAddress)
 	http.Handle(*metricsPath, prometheus.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			level := r.FormValue("level")
+			err := log.Base().SetLevel(level)
+			if err != nil {
+				log.Error("Failed to set log level: ", err)
+			} else {
+				*logLevel = level
+				log.Info("Log level set to ", level)
+			}
+		}
+		optionsHTML := ""
+		logLevels := []string{"debug", "info", "warn", "error", "fatal"}
+		for _, level := range logLevels {
+			if *logLevel == level {
+				optionsHTML += "<option selected>" + level + "</option>"
+			} else {
+				optionsHTML += "<option>" + level + "</option>"
+			}
+		}
 		w.Write([]byte(`<!doctype html>
 			<html lang="en-US">
 			<head>
@@ -123,7 +142,18 @@ the availability of /proc.`
 			</head>
 			<body>
 				<h1>GridServer Exporter for Prometheus</h1>
-				<p><a href='` + *metricsPath + `'>Metrics</a></p>
+				<p><a href="` + *metricsPath + `">Metrics</a></p>
+				<form action="" method="post">
+					<p>
+						<label>Log Level:</label>
+						&nbsp;
+						<select name="level">
+							` + optionsHTML + `
+						</select>
+						&nbsp;
+						<button>Save</button>
+					</p>
+				</form>
             </body>
             </html>`))
 	})
