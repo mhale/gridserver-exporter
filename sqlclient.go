@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
 	"github.com/prometheus/common/log"
 	_ "gopkg.in/goracle.v2"
 )
@@ -105,7 +106,7 @@ func NewSQLClient(uri string, schema string, timeout time.Duration) (*SQLClient,
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		log.With("driver", driver).Debugf("Failed to open database: %s", err)
-		return nil, err
+		return nil, errors.Wrap(err, "failed to open database")
 	}
 
 	return &SQLClient{
@@ -129,7 +130,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
 			log.With("elapsed", elapsed).Debugf("Failed to connect to database: %s", err)
-			return grid, nil, err
+			return grid, nil, errors.Wrap(err, "failed to connect to database")
 		}
 		log.With("elapsed", elapsed).Debug("Connected to database")
 
@@ -141,7 +142,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
 			log.With("elapsed", elapsed).With("sql", query).Debugf("SQL query failed: %s", err)
-			return grid, nil, err
+			return grid, nil, errors.Wrap(err, "SQL query failed")
 		}
 		defer rows.Close()
 		log.With("elapsed", elapsed).Debug("SQL query succeeded")
@@ -155,7 +156,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 			err = rows.Scan(&brokerID, &brokerURL, &r.Name, &r.BusyEngines, &r.TotalEngines, &r.Drivers, &r.UptimeMinutes, &r.ServicesRunning, &r.TasksPending, &ts)
 			if err != nil {
 				log.Debugf("Row scan failed: %s", err)
-				return grid, nil, err
+				return grid, nil, errors.Wrap(err, "row scan failed")
 			}
 
 			parsedURL, err := url.Parse(brokerURL)
@@ -176,7 +177,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		err = rows.Err()
 		if err != nil {
 			log.Debugf("Row processing failed: %s", err)
-			return grid, nil, err
+			return grid, nil, errors.Wrap(err, "row processing failed")
 		}
 
 		// Sum the individual broker reports to calculate an entire grid report.

@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/common/version"
-
+	"github.com/pkg/errors"
 	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/version"
 )
 
 const (
@@ -382,7 +382,7 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
 			log.With("elapsed", elapsed).With("operation", "getAllBrokerInfo").Debugf("SOAP call failed: %s", err)
-			return grid, nil, err
+			return grid, nil, errors.Wrap(err, "SOAP call failed")
 		}
 		log.With("elapsed", elapsed).With("operation", "getAllBrokerInfo").Debug("SOAP call succeeded")
 
@@ -412,7 +412,7 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
 			log.With("elapsed", elapsed).With("operation", "getRunningServiceCount").Debugf("SOAP call failed: %s", err)
-			return grid, nil, err
+			return grid, nil, errors.Wrap(err, "SOAP call failed")
 		}
 		log.With("elapsed", elapsed).With("operation", "getRunningServiceCount").Debug("SOAP call succeeded")
 
@@ -421,7 +421,7 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
 			log.With("elapsed", elapsed).With("operation", "getRunningInvocationCount").Debugf("SOAP call failed: %s", err)
-			return grid, nil, err
+			return grid, nil, errors.Wrap(err, "SOAP call failed")
 		}
 		log.With("elapsed", elapsed).With("operation", "getRunningInvocationCount").Debug("SOAP call succeeded")
 
@@ -430,7 +430,7 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
 			log.With("elapsed", elapsed).With("operation", "getPendingInvocationCount").Debugf("SOAP call failed: %s", err)
-			return grid, nil, err
+			return grid, nil, errors.Wrap(err, "SOAP call failed")
 		}
 		log.With("elapsed", elapsed).With("operation", "getPendingInvocationCount").Debug("SOAP call succeeded")
 
