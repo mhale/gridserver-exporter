@@ -54,7 +54,7 @@ type SQLClient struct {
 func NewSQLClient(uri string, schema string, timeout time.Duration) (*SQLClient, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %s", err)
+		return nil, errors.Wrap(err, "invalid URL")
 	}
 	username := u.User.Username()
 	if len(username) == 0 {
@@ -70,7 +70,7 @@ func NewSQLClient(uri string, schema string, timeout time.Duration) (*SQLClient,
 	if len(u.Port()) > 0 {
 		intPort, err := strconv.Atoi(u.Port())
 		if err != nil || 0 > intPort || intPort > 65535 {
-			return nil, fmt.Errorf("invalid port: %s", u.Port())
+			return nil, fmt.Errorf("invalid port: %q", u.Port())
 		}
 	}
 
@@ -105,8 +105,8 @@ func NewSQLClient(uri string, schema string, timeout time.Duration) (*SQLClient,
 
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
-		log.With("driver", driver).Debugf("Failed to open database: %s", err)
-		return nil, errors.Wrap(err, "failed to open database")
+		log.With("driver", driver).With("error", err).Debug("Database client creation failed")
+		return nil, errors.Wrap(err, "database client creation failed")
 	}
 
 	return &SQLClient{
@@ -129,10 +129,10 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		err := s.db.Ping()
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).Debugf("Failed to connect to database: %s", err)
-			return grid, nil, errors.Wrap(err, "failed to connect to database")
+			log.With("elapsed", elapsed).With("error", err).Debug("Database connection failed")
+			return grid, nil, errors.Wrap(err, "database connection failed")
 		}
-		log.With("elapsed", elapsed).Debug("Connected to database")
+		log.With("elapsed", elapsed).Debug("Database connection succeeded")
 
 		query := fmt.Sprintf(queryTmpl, s.Schema)        // Insert the schema
 		query = strings.Join(strings.Fields(query), " ") // Remove the line breaks and tabs for logs
@@ -141,7 +141,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		rows, err := s.db.Query(query)
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("sql", query).Debugf("SQL query failed: %s", err)
+			log.With("elapsed", elapsed).With("error", err).With("sql", query).Debug("SQL query failed")
 			return grid, nil, errors.Wrap(err, "SQL query failed")
 		}
 		defer rows.Close()
@@ -155,7 +155,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 
 			err = rows.Scan(&brokerID, &brokerURL, &r.Name, &r.BusyEngines, &r.TotalEngines, &r.Drivers, &r.UptimeMinutes, &r.ServicesRunning, &r.TasksPending, &ts)
 			if err != nil {
-				log.Debugf("Row scan failed: %s", err)
+				log.With("error", err).Debug("Row scan failed")
 				return grid, nil, errors.Wrap(err, "row scan failed")
 			}
 
@@ -171,16 +171,16 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 			// This is likely to be a transient error e.g. during a reboot.
 			age := time.Since(ts).Round(time.Second)
 			if age > 1*time.Minute {
-				log.With("age", age).With("hostname", r.Hostname).Warnf("Most recent report for Broker '%s' is more than 60 seconds old", r.Name)
+				log.With("age", age).With("hostname", r.Hostname).With("name", r.Name).Warn("Most recent report for Broker is more than 60 seconds old")
 			}
 		}
 		err = rows.Err()
 		if err != nil {
-			log.Debugf("Row processing failed: %s", err)
+			log.With("error", err).Debug("Row processing failed")
 			return grid, nil, errors.Wrap(err, "row processing failed")
 		}
 
-		// Sum the individual broker reports to calculate an entire grid report.
+		// Add up the individual broker reports to calculate an entire grid report.
 		for _, broker := range brokers {
 			grid.BusyEngines += broker.BusyEngines
 			grid.TotalEngines += broker.TotalEngines

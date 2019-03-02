@@ -195,7 +195,7 @@ type SOAPClient struct {
 func NewSOAPClient(uri string, sslVerify bool, timeout time.Duration) (*SOAPClient, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %s", err)
+		return nil, errors.Wrap(err, "invalid URL")
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return nil, fmt.Errorf("unsupported scheme: %q", u.Scheme)
@@ -215,7 +215,7 @@ func NewSOAPClient(uri string, sslVerify bool, timeout time.Duration) (*SOAPClie
 	if len(u.Port()) > 0 {
 		intPort, err := strconv.Atoi(u.Port())
 		if err != nil || 0 > intPort || intPort > 65535 {
-			return nil, fmt.Errorf("invalid port: %s", u.Port())
+			return nil, fmt.Errorf("invalid port: %q", u.Port())
 		}
 		port = strconv.Itoa(intPort)
 	}
@@ -268,7 +268,8 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	// Create HTTP request.
 	req, err := http.NewRequest("POST", url, buffer)
 	if err != nil {
-		return err
+		log.With("error", err).With("request", reqXML).With("url", url).Debug("HTTP request creation failed")
+		return errors.Wrap(err, "HTTP request creation failed")
 	}
 	req.SetBasicAuth(s.Username, s.Password)
 	req.Header.Add("Content-Type", "text/xml; charset=\"utf-8\"")
@@ -291,16 +292,16 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	// Transmit HTTP request.
 	res, err := client.Do(req)
 	if err != nil {
-		log.With("url", url).Debugf("HTTP client error: %s", err)
-		return err
+		log.With("url", url).With("error", err).Debug("HTTP request failed")
+		return errors.Wrap(err, "HTTP request failed")
 	}
 	defer res.Body.Close()
 
 	// Receive HTTP response.
 	rawbody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.With("request", reqXML).With("response", string(rawbody)).With("url", url).Debugf("Error reading HTTP response body: %s", err)
-		return err
+		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", url).Debug("HTTP response body read failed")
+		return errors.Wrap(err, "HTTP response body read failed")
 	}
 	if len(rawbody) == 0 {
 		return fmt.Errorf("received empty response from server")
@@ -313,15 +314,15 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	respEnvelope.Body = SOAPBody{Content: response}
 	err = xml.Unmarshal(rawbody, respEnvelope)
 	if err != nil {
-		log.With("request", reqXML).With("response", string(rawbody)).With("url", url).Debugf("Received invalid SOAP response: %s", err)
-		return err
+		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", url).Debug("Received invalid SOAP response")
+		return errors.Wrap(err, "received invalid SOAP response")
 	}
 
 	// Check for faults.
 	fault := respEnvelope.Body.Fault
 	if fault != nil {
-		log.With("request", reqXML).With("response", string(rawbody)).With("url", url).Debugf("Received SOAP fault: %s", fault)
-		return fault
+		log.With("fault", fault).With("request", reqXML).With("response", string(rawbody)).With("url", url).Debug("Received SOAP fault")
+		return errors.Wrap(fault, "received SOAP fault")
 	}
 
 	return nil
@@ -333,7 +334,7 @@ func (s *SOAPClient) GetAllBrokerInfo() ([]*BrokerInfo, error) {
 	response := new(GetAllBrokerInfoResponse)
 	err := s.Call(endpoint, new(GetAllBrokerInfo), response)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "SOAP call failed")
 	}
 	return response.BrokerInfos, nil
 }
@@ -344,7 +345,7 @@ func (s *SOAPClient) GetRunningServiceCount() (int, error) {
 	response := new(GetRunningServiceCountResponse)
 	err := s.Call(endpoint, new(GetRunningServiceCount), response)
 	if err != nil {
-		return -1, err
+		return -1, errors.Wrap(err, "SOAP call failed")
 	}
 	return response.GetRunningServiceCountReturn, nil
 }
@@ -355,7 +356,7 @@ func (s *SOAPClient) GetRunningInvocationCount() (int, error) {
 	response := new(GetRunningInvocationCountResponse)
 	err := s.Call(endpoint, new(GetRunningInvocationCount), response)
 	if err != nil {
-		return -1, err
+		return -1, errors.Wrap(err, "SOAP call failed")
 	}
 	return response.GetRunningInvocationCountReturn, nil
 }
@@ -366,7 +367,7 @@ func (s *SOAPClient) GetPendingInvocationCount() (int, error) {
 	response := new(GetPendingInvocationCountResponse)
 	err := s.Call(endpoint, new(GetPendingInvocationCount), response)
 	if err != nil {
-		return -1, err
+		return -1, errors.Wrap(err, "SOAP call failed")
 	}
 	return response.GetPendingInvocationCountReturn, nil
 }
@@ -381,10 +382,10 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		brokerInfos, err := s.GetAllBrokerInfo()
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("operation", "getAllBrokerInfo").Debugf("SOAP call failed: %s", err)
-			return grid, nil, errors.Wrap(err, "SOAP call failed")
+			log.With("elapsed", elapsed).With("error", err).Debug("getAllBrokerInfo failed")
+			return grid, nil, errors.Wrap(err, "getAllBrokerInfo failed")
 		}
-		log.With("elapsed", elapsed).With("operation", "getAllBrokerInfo").Debug("SOAP call succeeded")
+		log.With("elapsed", elapsed).With("brokers", len(brokerInfos)).Debug("getAllBrokerInfo succeeded")
 
 		for _, brokerInfo := range brokerInfos {
 			baseURL, _ := url.Parse(brokerInfo.BaseURL)
@@ -411,28 +412,28 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		grid.ServicesRunning, err = s.GetRunningServiceCount()
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("operation", "getRunningServiceCount").Debugf("SOAP call failed: %s", err)
-			return grid, nil, errors.Wrap(err, "SOAP call failed")
+			log.With("elapsed", elapsed).With("error", err).Debug("getRunningServiceCount failed")
+			return grid, nil, errors.Wrap(err, "getRunningServiceCount failed")
 		}
-		log.With("elapsed", elapsed).With("operation", "getRunningServiceCount").Debug("SOAP call succeeded")
+		log.With("elapsed", elapsed).With("servicesRunning", grid.ServicesRunning).Debug("getRunningServiceCount succeeded")
 
 		start = time.Now()
 		grid.TasksRunning, err = s.GetRunningInvocationCount()
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("operation", "getRunningInvocationCount").Debugf("SOAP call failed: %s", err)
-			return grid, nil, errors.Wrap(err, "SOAP call failed")
+			log.With("elapsed", elapsed).With("error", err).Debug("getRunningInvocationCount failed")
+			return grid, nil, errors.Wrap(err, "getRunningInvocationCount failed")
 		}
-		log.With("elapsed", elapsed).With("operation", "getRunningInvocationCount").Debug("SOAP call succeeded")
+		log.With("elapsed", elapsed).With("tasksRunning", grid.TasksRunning).Debug("getRunningInvocationCount succeeded")
 
 		start = time.Now()
 		grid.TasksPending, err = s.GetPendingInvocationCount()
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("operation", "getPendingInvocationCount").Debugf("SOAP call failed: %s", err)
-			return grid, nil, errors.Wrap(err, "SOAP call failed")
+			log.With("elapsed", elapsed).With("error", err).Debug("getPendingInvocationCount failed")
+			return grid, nil, errors.Wrap(err, "getPendingInvocationCount failed")
 		}
-		log.With("elapsed", elapsed).With("operation", "getPendingInvocationCount").Debug("SOAP call succeeded")
+		log.With("elapsed", elapsed).With("tasksPending", grid.TasksPending).Debug("getPendingInvocationCount succeeded")
 
 		return grid, brokers, nil
 	}

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
@@ -53,20 +53,25 @@ the availability of /proc.`
 
 	err := log.Base().SetFormat(*logFormat)
 	if err != nil {
-		log.Fatalf("Invalid log format: %s", *logFormat)
+		log.With("format", *logFormat).With("error", err).Fatal("Invalid log format")
 	}
 
 	err = log.Base().SetLevel(*logLevel)
 	if err != nil {
-		log.Fatalf("Invalid log level: %s", *logLevel)
+		log.With("level", *logLevel).With("error", err).Fatal("Invalid log level")
 	}
 
-	log.Infoln("Starting GridServer Exporter", version.Info())
-	log.Infoln("Build context", version.BuildContext())
+	log.With("version", version.Version).Info("Starting GridServer Exporter")
+	log.With("go", version.GoVersion).
+		With("user", version.BuildUser).
+		With("date", version.BuildDate).
+		With("branch", version.Branch).
+		With("revision", version.Revision).
+		Debug("Build context")
 
 	exporter, err := NewExporter(*url, *tlsVerify, *schema, *timeout)
 	if err != nil {
-		log.Fatalf("Start failed: %s", err)
+		log.With("error", err).Fatal("Start failed")
 	}
 
 	// Fetch statistics once and exit if requested.
@@ -75,17 +80,17 @@ the availability of /proc.`
 		grid, _, err := exporter.Fetch()
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).Fatalf("Scrape failed: %s", err)
-			return
+			log.With("elapsed", elapsed).With("error", err).Error("Scrape failed")
+		} else {
+			log.With("elapsed", elapsed).
+				With("busyEngines", grid.BusyEngines).
+				With("drivers", grid.Drivers).
+				With("servicesRunning", grid.ServicesRunning).
+				With("tasksPending", grid.TasksPending).
+				With("tasksRunning", grid.TasksRunning).
+				With("totalEngines", grid.TotalEngines).
+				Info("Scrape succeeded")
 		}
-		log.With("elapsed", elapsed).
-			With("busyEngines", grid.BusyEngines).
-			With("drivers", grid.Drivers).
-			With("servicesRunning", grid.ServicesRunning).
-			With("tasksPending", grid.TasksPending).
-			With("tasksRunning", grid.TasksRunning).
-			With("totalEngines", grid.TotalEngines).
-			Info("Scrape succeeded")
 		return
 	}
 
@@ -95,19 +100,19 @@ the availability of /proc.`
 	// Configure process metric collection if supported by the runtime.
 	if *pidFile != "" {
 		if _, err := procfs.NewStat(); err != nil {
-			log.Warn("Process metrics requested but not supported on this system")
+			log.Fatal("Process metrics requested but not supported on this system")
 		} else {
 			procExporter := prometheus.NewProcessCollectorPIDFn(
 				func() (int, error) {
 					content, err := ioutil.ReadFile(*pidFile)
 					if err != nil {
-						log.Errorf("Can't read PID file: %s", err)
-						return 0, fmt.Errorf("Can't read PID file: %s", err)
+						log.With("pidfile", *pidFile).With("error", err).Error("PID file read failed")
+						return 0, errors.Wrap(err, "PID file read failed")
 					}
 					value, err := strconv.Atoi(strings.TrimSpace(string(content)))
 					if err != nil {
-						log.Errorf("Can't parse PID file: %s", err)
-						return 0, fmt.Errorf("Can't parse PID file: %s", err)
+						log.With("pidfile", *pidFile).With("error", err).Error("PID file parse failed")
+						return 0, errors.Wrap(err, "PID file parse failed")
 					}
 					return value, nil
 				}, namespace)
@@ -122,10 +127,11 @@ the availability of /proc.`
 			level := r.FormValue("level")
 			err := log.Base().SetLevel(level)
 			if err != nil {
-				log.Error("Failed to set log level: ", err)
+				log.With("error", err).Error("Log level override failed")
 			} else {
+				oldLevel := *logLevel
 				*logLevel = level
-				log.Info("Log level set to ", level)
+				log.With("oldLevel", oldLevel).With("newLevel", level).Info("Log level override succeeded")
 			}
 		}
 		optionsHTML := ""
@@ -162,6 +168,6 @@ the availability of /proc.`
 	})
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
-	log.Infoln("Listening on", *listenAddress)
+	log.With("address", *listenAddress).Info("Listening on network")
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }

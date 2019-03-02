@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -75,16 +76,17 @@ type Exporter struct {
 func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duration) (*Exporter, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %s", err)
+		return nil, errors.Wrap(err, "invalid URL")
 	}
 
+	// Determine which client to use.
 	var fetch func() (GridReport, []BrokerReport, error)
 	switch u.Scheme {
 	case "http", "https":
 		client, err := NewSOAPClient(uri, sslVerify, timeout)
 		if err != nil {
-			log.Debugf("SOAP client creation failed: %s", err)
-			return nil, fmt.Errorf("SOAP client creation failed: %s", err)
+			log.With("error", err).Debug("SOAP client creation failed")
+			return nil, errors.Wrap(err, "SOAP client creation failed")
 		}
 		fetch = client.Fetch()
 		u.User = url.User(u.User.Username()) // Filter password from logs
@@ -92,8 +94,8 @@ func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duratio
 	case "postgres", "postgresql", "mssql", "sqlserver", "ora", "oracle":
 		client, err := NewSQLClient(uri, schema, timeout)
 		if err != nil {
-			log.Debugf("SQL client creation failed: %s", err)
-			return nil, fmt.Errorf("SQL client creation failed: %s", err)
+			log.With("error", err).Debug("SQL client creation failed")
+			return nil, errors.Wrap(err, "SQL client creation failed")
 		}
 		fetch = client.Fetch()
 		u.User = url.User(u.User.Username()) // Filter password from logs
@@ -180,7 +182,7 @@ func (e *Exporter) scrape() {
 	if err != nil {
 		e.up.Set(0)
 		e.failedScrapes.Inc()
-		log.With("elapsed", elapsed).Errorf("Scrape failed: %s", err)
+		log.With("elapsed", elapsed).With("error", err).Error("Scrape failed")
 		return
 	}
 	e.up.Set(1)
@@ -220,6 +222,16 @@ func (e *Exporter) scrape() {
 		if broker.UptimeMinutes >= 0 {
 			e.brokerMetrics["uptime_minutes"].WithLabelValues(broker.Name, broker.Hostname).Set(float64(broker.UptimeMinutes))
 		}
+
+		log.With("busyEngines", broker.BusyEngines).
+			With("drivers", broker.Drivers).
+			With("hostname", broker.Hostname).
+			With("name", broker.Name).
+			With("servicesRunning", broker.ServicesRunning).
+			With("tasksPending", broker.TasksPending).
+			With("totalEngines", broker.TotalEngines).
+			With("uptimeMinutes", broker.UptimeMinutes).
+			Debug("Broker metrics processed")
 	}
 }
 
