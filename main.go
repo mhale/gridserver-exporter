@@ -168,6 +168,6 @@ the availability of /proc.`
 	})
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
-	log.With("address", *listenAddress).Info("Listening on network")
+	log.With("address", *listenAddress).With("path", *metricsPath).Info("Listening on network")
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
