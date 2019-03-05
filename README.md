@@ -70,6 +70,7 @@ The SQL Server support uses the [go-mssqldb](https://github.com/denisenkom/go-ms
 ```bash
 gridserver-exporter -u sqlserver://username:password@host/instance?database=databasename
 ```
+
 For SQL Server specific options, see the [go-mssqldb Readme file](https://github.com/denisenkom/go-mssqldb/blob/master/README.md).
 
 #### PostgreSQL
@@ -141,7 +142,7 @@ gridserver-exporter -u http://username:password@host --once
 
 - The Oracle Instant Client installs signal handlers which may cause crashes when CTRL-C is entered. Adding the following flags to the `sqlnet.ora` file on the system may prevent the crashes.
 
-```
+```bash
 DIAG_ADR_ENABLED=OFF
 DIAG_DDE_ENABLED=FALSE
 DIAG_SIGHANDLER_ENABLED=FALSE
