@@ -188,6 +188,7 @@ func (e *Exporter) scrape() {
 	e.up.Set(1)
 
 	log.With("elapsed", elapsed).
+		With("brokers", len(brokers)).
 		With("busyEngines", grid.BusyEngines).
 		With("drivers", grid.Drivers).
 		With("servicesRunning", grid.ServicesRunning).
