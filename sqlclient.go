@@ -35,9 +35,9 @@ const (
 			broker_stats.num_tasks_pending,
 			latest.max_time_stamp AS time_stamp
 		FROM latest
-		LEFT JOIN %[1]s.broker_stats ON %[1]s.broker_stats.broker_id = latest.broker_id
+		INNER JOIN %[1]s.broker_stats ON %[1]s.broker_stats.broker_id = latest.broker_id
 			AND %[1]s.broker_stats.time_stamp = latest.max_time_stamp
-		LEFT JOIN %[1]s.brokers ON %[1]s.brokers.broker_id = latest.broker_id
+		INNER JOIN %[1]s.brokers ON %[1]s.brokers.broker_id = latest.broker_id
 		`
 )
 
