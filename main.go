@@ -160,7 +160,7 @@ the availability of /proc.`
 							` + optionsHTML + `
 						</select>
 						&nbsp;
-						<button>Save</button>
+						<button>Apply</button>
 					</p>
 				</form>
             </body>
