@@ -3,6 +3,7 @@
 *.dll
 *.so
 *.dylib
+gridserver-exporter
 
 # Test binary, build with `go test -c`
 *.test
