@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/procfs"
@@ -102,8 +103,8 @@ the availability of /proc.`
 		if _, err := procfs.NewStat(); err != nil {
 			log.Fatal("Process metrics requested but not supported on this system")
 		} else {
-			procExporter := prometheus.NewProcessCollectorPIDFn(
-				func() (int, error) {
+			procExporter := prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{
+				PidFn: func() (int, error) {
 					content, err := ioutil.ReadFile(*pidFile)
 					if err != nil {
 						log.With("pidfile", *pidFile).With("error", err).Error("PID file read failed")
@@ -115,13 +116,15 @@ the availability of /proc.`
 						return 0, errors.Wrap(err, "PID file parse failed")
 					}
 					return value, nil
-				}, namespace)
+				},
+				Namespace: namespace,
+			})
 			prometheus.MustRegister(procExporter)
 		}
 	}
 
 	// Configure web server to be both browser and Prometheus friendly.
-	http.Handle(*metricsPath, prometheus.Handler())
+	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			level := r.FormValue("level")
