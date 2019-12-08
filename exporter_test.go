@@ -51,7 +51,7 @@ func readGauge(m prometheus.Gauge) float64 {
 }
 
 func TestInvalidScheme(t *testing.T) {
-	e, err := NewExporter("gopher://gopher.quux.org", false, "", 1*time.Second)
+	e, err := NewExporter("gopher://gopher.quux.org", false, "", 1*time.Second, false)
 	if expect, got := (*Exporter)(nil), e; expect != got {
 		t.Errorf("expected %v, got %v", expect, got)
 	}
@@ -68,7 +68,7 @@ func TestNotFound(t *testing.T) {
 	url := strings.Replace(s.URL, "http://", "http://user:pass@", 1) // Prevent SOAP client errors
 	defer s.Close()
 
-	e, err := NewExporter(url, false, "", 1*time.Second)
+	e, err := NewExporter(url, false, "", 1*time.Second, false)
 	if err != nil {
 		t.Fatal(err)
 	}

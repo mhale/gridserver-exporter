@@ -45,6 +45,7 @@ the availability of /proc.`
 		pidFile       = kingpin.Flag("pid-file", pidFileHelpText).PlaceHolder("FILENAME").Short('p').Envar("GRIDSERVER_EXPORTER_PID_FILE").String()
 		logLevel      = kingpin.Flag("log-level", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]").Default("info").Envar("GRIDSERVER_EXPORTER_LOG_LEVEL").String()
 		logFormat     = kingpin.Flag("log-format", `Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true"`).Default("logger:stderr").Envar("GRIDSERVER_EXPORTER_LOG_FORMAT").String()
+		directorOnly  = kingpin.Flag("director-only", "Restrict Web Services (SOAP) calls to the Director. Per-Broker service and task metrics will not be collected.").Default("false").Envar("GRIDSERVER_EXPORTER_DIRECTOR_ONLY").Bool()
 	)
 
 	kingpin.Version(version.Print("gridserver-exporter"))
@@ -70,7 +71,7 @@ the availability of /proc.`
 		With("revision", version.Revision).
 		Debug("Build context")
 
-	exporter, err := NewExporter(*url, *tlsVerify, *schema, *timeout)
+	exporter, err := NewExporter(*url, *tlsVerify, *schema, *timeout, *directorOnly)
 	if err != nil {
 		log.With("error", err).Fatal("Start failed")
 	}

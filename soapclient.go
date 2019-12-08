@@ -184,15 +184,16 @@ func (f *SOAPFault) Error() string {
 
 // SOAPClient is a custom SOAP client specific to GridServer Web Services.
 type SOAPClient struct {
-	URL       string
-	Username  string
-	Password  string
-	TLSConfig *tls.Config
-	Timeout   time.Duration
+	URL          string
+	Username     string
+	Password     string
+	TLSConfig    *tls.Config
+	Timeout      time.Duration
+	DirectorOnly bool
 }
 
 // NewSOAPClient returns a new SOAPClient configured for accessing a GridServer Manager.
-func NewSOAPClient(uri string, sslVerify bool, timeout time.Duration) (*SOAPClient, error) {
+func NewSOAPClient(uri string, sslVerify bool, timeout time.Duration, directorOnly bool) (*SOAPClient, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid URL")
@@ -230,11 +231,12 @@ func NewSOAPClient(uri string, sslVerify bool, timeout time.Duration) (*SOAPClie
 	}
 
 	return &SOAPClient{
-		URL:       director.String(),
-		Username:  username,
-		Password:  password,
-		TLSConfig: tlsCfg,
-		Timeout:   timeout,
+		URL:          director.String(),
+		Username:     username,
+		Password:     password,
+		TLSConfig:    tlsCfg,
+		Timeout:      timeout,
+		DirectorOnly: directorOnly,
 	}, nil
 }
 
@@ -398,46 +400,49 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 				UptimeMinutes:   -1,
 			}
 
-			endpoint := brokerInfo.BaseURL + "/webservices/ServiceAdmin"
+			// If not operating in Director only mode, collect the per-Broker metrics.
+			if !s.DirectorOnly {
+				endpoint := brokerInfo.BaseURL + "/webservices/ServiceAdmin"
 
-			start = time.Now()
-			broker.ServicesRunning, err = s.GetRunningServiceCount(endpoint)
-			elapsed = time.Since(start).Round(time.Millisecond)
-			if err != nil {
-				log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getRunningServiceCount failed")
-				return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningServiceCount failed")
-			}
-			log.With("elapsed", elapsed).
-				With("hostname", broker.Hostname).
-				With("name", broker.Name).
-				With("servicesRunning", broker.ServicesRunning).
-				Debug("ServiceAdmin.getRunningServiceCount succeeded")
+				start = time.Now()
+				broker.ServicesRunning, err = s.GetRunningServiceCount(endpoint)
+				elapsed = time.Since(start).Round(time.Millisecond)
+				if err != nil {
+					log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getRunningServiceCount failed")
+					return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningServiceCount failed")
+				}
+				log.With("elapsed", elapsed).
+					With("hostname", broker.Hostname).
+					With("name", broker.Name).
+					With("servicesRunning", broker.ServicesRunning).
+					Debug("ServiceAdmin.getRunningServiceCount succeeded")
 
-			start = time.Now()
-			broker.TasksRunning, err = s.GetRunningInvocationCount(endpoint)
-			elapsed = time.Since(start).Round(time.Millisecond)
-			if err != nil {
-				log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getRunningInvocationCount failed")
-				return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningInvocationCount failed")
-			}
-			log.With("elapsed", elapsed).
-				With("hostname", broker.Hostname).
-				With("name", broker.Name).
-				With("tasksRunning", broker.TasksRunning).
-				Debug("ServiceAdmin.getRunningInvocationCount succeeded")
+				start = time.Now()
+				broker.TasksRunning, err = s.GetRunningInvocationCount(endpoint)
+				elapsed = time.Since(start).Round(time.Millisecond)
+				if err != nil {
+					log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getRunningInvocationCount failed")
+					return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningInvocationCount failed")
+				}
+				log.With("elapsed", elapsed).
+					With("hostname", broker.Hostname).
+					With("name", broker.Name).
+					With("tasksRunning", broker.TasksRunning).
+					Debug("ServiceAdmin.getRunningInvocationCount succeeded")
 
-			start = time.Now()
-			broker.TasksPending, err = s.GetPendingInvocationCount(endpoint)
-			elapsed = time.Since(start).Round(time.Millisecond)
-			if err != nil {
-				log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getPendingInvocationCount failed")
-				return grid, nil, errors.Wrap(err, "ServiceAdmin.getPendingInvocationCount failed")
+				start = time.Now()
+				broker.TasksPending, err = s.GetPendingInvocationCount(endpoint)
+				elapsed = time.Since(start).Round(time.Millisecond)
+				if err != nil {
+					log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getPendingInvocationCount failed")
+					return grid, nil, errors.Wrap(err, "ServiceAdmin.getPendingInvocationCount failed")
+				}
+				log.With("elapsed", elapsed).
+					With("hostname", broker.Hostname).
+					With("name", broker.Name).
+					With("tasksPending", broker.TasksPending).
+					Debug("ServiceAdmin.getPendingInvocationCount succeeded")
 			}
-			log.With("elapsed", elapsed).
-				With("hostname", broker.Hostname).
-				With("name", broker.Name).
-				With("tasksPending", broker.TasksPending).
-				Debug("ServiceAdmin.getPendingInvocationCount succeeded")
 
 			brokers = append(brokers, broker)
 		}
@@ -447,36 +452,47 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 			grid.BusyEngines += broker.BusyEngines
 			grid.TotalEngines += broker.TotalEngines
 			grid.Drivers += broker.Drivers
+
+			// If not operating in Director only mode, use the per-Broker metrics.
+			if !s.DirectorOnly {
+				grid.ServicesRunning += broker.ServicesRunning
+				grid.TasksRunning += broker.TasksRunning
+				grid.TasksPending += broker.TasksPending
+			}
 		}
 
-		endpoint := s.URL + "/ManagerAdmin"
+		// If operating in Director only mode, the following metrics will not have been obtained from the Brokers,
+		// but they can be obtained at the grid level from the Director.
+		if s.DirectorOnly {
+			endpoint := s.URL + "/ManagerAdmin"
 
-		start = time.Now()
-		grid.ServicesRunning, err = s.GetRunningServiceCount(endpoint)
-		elapsed = time.Since(start).Round(time.Millisecond)
-		if err != nil {
-			log.With("elapsed", elapsed).With("error", err).Debug("ManagerAdmin.getRunningServiceCount failed")
-			return grid, nil, errors.Wrap(err, "ManagerAdmin.getRunningServiceCount failed")
-		}
-		log.With("elapsed", elapsed).With("servicesRunning", grid.ServicesRunning).Debug("ManagerAdmin.getRunningServiceCount succeeded")
+			start = time.Now()
+			grid.ServicesRunning, err = s.GetRunningServiceCount(endpoint)
+			elapsed = time.Since(start).Round(time.Millisecond)
+			if err != nil {
+				log.With("elapsed", elapsed).With("error", err).Debug("ManagerAdmin.getRunningServiceCount failed")
+				return grid, nil, errors.Wrap(err, "ManagerAdmin.getRunningServiceCount failed")
+			}
+			log.With("elapsed", elapsed).With("servicesRunning", grid.ServicesRunning).Debug("ManagerAdmin.getRunningServiceCount succeeded")
 
-		start = time.Now()
-		grid.TasksRunning, err = s.GetRunningInvocationCount(endpoint)
-		elapsed = time.Since(start).Round(time.Millisecond)
-		if err != nil {
-			log.With("elapsed", elapsed).With("error", err).Debug("ManagerAdmin.getRunningInvocationCount failed")
-			return grid, nil, errors.Wrap(err, "ManagerAdmin.getRunningInvocationCount failed")
-		}
-		log.With("elapsed", elapsed).With("tasksRunning", grid.TasksRunning).Debug("ManagerAdmin.getRunningInvocationCount succeeded")
+			start = time.Now()
+			grid.TasksRunning, err = s.GetRunningInvocationCount(endpoint)
+			elapsed = time.Since(start).Round(time.Millisecond)
+			if err != nil {
+				log.With("elapsed", elapsed).With("error", err).Debug("ManagerAdmin.getRunningInvocationCount failed")
+				return grid, nil, errors.Wrap(err, "ManagerAdmin.getRunningInvocationCount failed")
+			}
+			log.With("elapsed", elapsed).With("tasksRunning", grid.TasksRunning).Debug("ManagerAdmin.getRunningInvocationCount succeeded")
 
-		start = time.Now()
-		grid.TasksPending, err = s.GetPendingInvocationCount(endpoint)
-		elapsed = time.Since(start).Round(time.Millisecond)
-		if err != nil {
-			log.With("elapsed", elapsed).With("error", err).Debug("ManagerAdmin.getPendingInvocationCount failed")
-			return grid, nil, errors.Wrap(err, "ManagerAdmin.getPendingInvocationCount failed")
+			start = time.Now()
+			grid.TasksPending, err = s.GetPendingInvocationCount(endpoint)
+			elapsed = time.Since(start).Round(time.Millisecond)
+			if err != nil {
+				log.With("elapsed", elapsed).With("error", err).Debug("ManagerAdmin.getPendingInvocationCount failed")
+				return grid, nil, errors.Wrap(err, "ManagerAdmin.getPendingInvocationCount failed")
+			}
+			log.With("elapsed", elapsed).With("tasksPending", grid.TasksPending).Debug("ManagerAdmin.getPendingInvocationCount succeeded")
 		}
-		log.With("elapsed", elapsed).With("tasksPending", grid.TasksPending).Debug("ManagerAdmin.getPendingInvocationCount succeeded")
 
 		return grid, brokers, nil
 	}

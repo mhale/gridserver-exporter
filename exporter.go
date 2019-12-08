@@ -74,7 +74,7 @@ type Exporter struct {
 }
 
 // NewExporter returns an initialized Exporter.
-func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duration) (*Exporter, error) {
+func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duration, directorOnly bool) (*Exporter, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid URL")
@@ -84,7 +84,7 @@ func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duratio
 	var fetch func() (GridReport, []BrokerReport, error)
 	switch u.Scheme {
 	case "http", "https":
-		client, err := NewSOAPClient(uri, sslVerify, timeout)
+		client, err := NewSOAPClient(uri, sslVerify, timeout, directorOnly)
 		if err != nil {
 			log.With("error", err).Debug("SOAP client creation failed")
 			return nil, errors.Wrap(err, "SOAP client creation failed")
