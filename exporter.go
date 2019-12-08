@@ -22,8 +22,8 @@ type GridReport struct {
 	TotalEngines    int
 	Drivers         int
 	ServicesRunning int
-	TasksPending    int
 	TasksRunning    int // Only reported via SOAP.
+	TasksPending    int
 }
 
 // BrokerReport represents a snapshot of the current state of an individual Broker.
@@ -34,6 +34,7 @@ type BrokerReport struct {
 	TotalEngines    int
 	Drivers         int
 	ServicesRunning int // Only reported via SQL.
+	TasksRunning    int // Only reported via SOAP.
 	TasksPending    int // Only reported via SQL.
 	UptimeMinutes   int // Only reported via SQL.
 }
@@ -131,14 +132,15 @@ func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duratio
 			"total_engines":    newGridMetric("total_engines", "Number of Engines logged in.", nil),
 			"drivers":          newGridMetric("drivers", "Number of Drivers logged in.", nil),
 			"services_running": newGridMetric("services_running", "Number of Services running.", nil),
-			"tasks_pending":    newGridMetric("tasks_pending", "Number of tasks pending (not yet assigned to Engines).", nil),
 			"tasks_running":    newGridMetric("tasks_running", "Number of tasks running.", nil),
+			"tasks_pending":    newGridMetric("tasks_pending", "Number of tasks pending (not yet assigned to Engines).", nil),
 		},
 		brokerMetrics: map[string]*prometheus.GaugeVec{
 			"busy_engines":     newBrokerMetric("busy_engines", "Number of Engines busy.", nil),
 			"total_engines":    newBrokerMetric("total_engines", "Number of Engines logged in.", nil),
 			"drivers":          newBrokerMetric("drivers", "Number of Drivers logged in.", nil),
 			"services_running": newBrokerMetric("services_running", "Number of Services running.", nil),
+			"tasks_running":    newBrokerMetric("tasks_running", "Number of tasks running.", nil),
 			"tasks_pending":    newBrokerMetric("tasks_pending", "Number of tasks pending (not yet assigned to Engines).", nil),
 			"uptime_minutes":   newBrokerMetric("uptime_minutes", "Time since Broker start in minutes.", nil),
 		},
@@ -190,22 +192,22 @@ func (e *Exporter) scrape() {
 	log.With("elapsed", elapsed).
 		With("brokers", len(brokers)).
 		With("busyEngines", grid.BusyEngines).
+		With("totalEngines", grid.TotalEngines).
 		With("drivers", grid.Drivers).
 		With("servicesRunning", grid.ServicesRunning).
-		With("tasksPending", grid.TasksPending).
 		With("tasksRunning", grid.TasksRunning).
-		With("totalEngines", grid.TotalEngines).
+		With("tasksPending", grid.TasksPending).
 		Info("Scrape succeeded")
 
 	e.gridMetrics["busy_engines"].Set(float64(grid.BusyEngines))
 	e.gridMetrics["total_engines"].Set(float64(grid.TotalEngines))
 	e.gridMetrics["drivers"].Set(float64(grid.Drivers))
 	e.gridMetrics["services_running"].Set(float64(grid.ServicesRunning))
-	e.gridMetrics["tasks_pending"].Set(float64(grid.TasksPending))
 	// TasksRunning is only reported via SOAP.
 	if grid.TasksRunning >= 0 {
 		e.gridMetrics["tasks_running"].Set(float64(grid.TasksRunning))
 	}
+	e.gridMetrics["tasks_pending"].Set(float64(grid.TasksPending))
 
 	for _, broker := range brokers {
 		e.brokerMetrics["busy_engines"].WithLabelValues(broker.Name, broker.Hostname).Set(float64(broker.BusyEngines))
@@ -214,6 +216,10 @@ func (e *Exporter) scrape() {
 		// ServicesRunning is only reported via SQL.
 		if broker.ServicesRunning >= 0 {
 			e.brokerMetrics["services_running"].WithLabelValues(broker.Name, broker.Hostname).Set(float64(broker.ServicesRunning))
+		}
+		// TasksRunning is only reported via SOAP.
+		if broker.TasksRunning >= 0 {
+			e.brokerMetrics["tasks_running"].WithLabelValues(broker.Name, broker.Hostname).Set(float64(broker.TasksRunning))
 		}
 		// TasksPending is only reported via SQL.
 		if broker.TasksPending >= 0 {
@@ -224,13 +230,14 @@ func (e *Exporter) scrape() {
 			e.brokerMetrics["uptime_minutes"].WithLabelValues(broker.Name, broker.Hostname).Set(float64(broker.UptimeMinutes))
 		}
 
-		log.With("busyEngines", broker.BusyEngines).
-			With("drivers", broker.Drivers).
-			With("hostname", broker.Hostname).
+		log.With("hostname", broker.Hostname).
 			With("name", broker.Name).
-			With("servicesRunning", broker.ServicesRunning).
-			With("tasksPending", broker.TasksPending).
+			With("busyEngines", broker.BusyEngines).
 			With("totalEngines", broker.TotalEngines).
+			With("drivers", broker.Drivers).
+			With("servicesRunning", broker.ServicesRunning).
+			With("tasksRunning", broker.TasksRunning).
+			With("tasksPending", broker.TasksPending).
 			With("uptimeMinutes", broker.UptimeMinutes).
 			Debug("Broker metrics processed")
 	}

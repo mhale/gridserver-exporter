@@ -289,7 +289,7 @@ func TestSOAPClient_GetRunningServiceCount(t *testing.T) {
 			s := &SOAPClient{
 				URL: d.URL,
 			}
-			got, err := s.GetRunningServiceCount()
+			got, err := s.GetRunningServiceCount(d.URL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SOAPClient.GetRunningServiceCount() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -328,7 +328,7 @@ func TestSOAPClient_GetRunningInvocationCount(t *testing.T) {
 			s := &SOAPClient{
 				URL: d.URL,
 			}
-			got, err := s.GetRunningInvocationCount()
+			got, err := s.GetRunningInvocationCount(d.URL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SOAPClient.GetRunningInvocationCount() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -367,7 +367,7 @@ func TestSOAPClient_GetPendingInvocationCount(t *testing.T) {
 			s := &SOAPClient{
 				URL: d.URL,
 			}
-			got, err := s.GetPendingInvocationCount()
+			got, err := s.GetPendingInvocationCount(d.URL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SOAPClient.GetPendingInvocationCount() error = %v, wantErr %v", err, tt.wantErr)
 				return
