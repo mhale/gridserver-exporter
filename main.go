@@ -79,12 +79,13 @@ the availability of /proc.`
 	// Fetch statistics once and exit if requested.
 	if *once == true {
 		start := time.Now()
-		grid, _, err := exporter.Fetch()
+		grid, brokers, err := exporter.Fetch()
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
 			log.With("elapsed", elapsed).With("error", err).Error("Scrape failed")
 		} else {
 			log.With("elapsed", elapsed).
+				With("brokers", len(brokers)).
 				With("busyEngines", grid.BusyEngines).
 				With("drivers", grid.Drivers).
 				With("servicesRunning", grid.ServicesRunning).
