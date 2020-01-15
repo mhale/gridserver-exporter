@@ -171,7 +171,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 			// This is likely to be a transient error e.g. during a reboot.
 			age := time.Since(ts).Round(time.Second)
 			if age > 1*time.Minute {
-				log.With("age", age).With("hostname", r.Hostname).With("name", r.Name).Warn("Most recent report for Broker is more than 60 seconds old")
+				log.With("age", age).With("hostname", r.Hostname).With("name", r.Name).With("id", brokerID).Warn("Most recent report for Broker is more than 60 seconds old")
 			}
 		}
 		err = rows.Err()
