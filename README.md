@@ -109,25 +109,24 @@ gridserver-exporter -u mock://
 
 The goracle package depends on [ODPI](https://github.com/oracle/odpi), which has [installation requirements](https://oracle.github.io/odpi/doc/installation.html).
 
-The package dependencies can be satisfied with:
-
-```bash
-go get github.com/denisenkom/go-mssqldb
-go get github.com/lib/pq
-go get github.com/prometheus/client_golang/prometheus
-go get github.com/sirupsen/logrus
-go get gopkg.in/alecthomas/kingpin.v2
-go get gopkg.in/goracle.v2
-```
-
 The compile-time version information can be set with `ldflags`:
 
 ```bash
-go build -ldflags "-X github.com/prometheus/common/version.Version=$VERSION \
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+REVISION=$(git rev-parse HEAD)
+DATE=$(date +%F)
+go build -ldflags "-X github.com/prometheus/common/version.Branch=$BRANCH \
 -X github.com/prometheus/common/version.Revision=$REVISION \
--X github.com/prometheus/common/version.Branch=$BRANCH \
--X github.com/prometheus/common/version.BuildUser=$USER \
--X github.com/prometheus/common/version.BuildDate=$DATE"
+-X github.com/prometheus/common/version.BuildDate=$DATE \
+-X github.com/prometheus/common/version.BuildUser=$USER"
+```
+
+### Vendoring
+
+If the dependencies are vendored, `go mod vendor` will skip the `odpi` directory because it does not contain any .go files. This may be resolved with:
+
+```bash
+go get && cp -r ~/go/pkg/mod/gopkg.in/goracle.v2*/odpi vendor/gopkg.in/goracle.v2/
 ```
 
 ### Configuring
