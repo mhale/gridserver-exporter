@@ -33,10 +33,10 @@ type BrokerReport struct {
 	BusyEngines     int
 	TotalEngines    int
 	Drivers         int
-	ServicesRunning int // Only reported via SQL.
-	TasksRunning    int // Only reported via SOAP.
-	TasksPending    int // Only reported via SQL.
-	UptimeMinutes   int // Only reported via SQL.
+	ServicesRunning int     // Only reported via SQL.
+	TasksRunning    int     // Only reported via SOAP.
+	TasksPending    int     // Only reported via SQL.
+	UptimeMinutes   float64 // Only reported via SQL.
 }
 
 func newGridMetric(metricName string, docString string, constLabels prometheus.Labels) prometheus.Gauge {

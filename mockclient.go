@@ -38,7 +38,7 @@ func (m *MockClient) Fetch() func() (GridReport, []BrokerReport, error) {
 				Drivers:         r.Intn(10),
 				ServicesRunning: r.Intn(50),
 				TasksPending:    r.Intn(100000),
-				UptimeMinutes:   r.Intn(10000),
+				UptimeMinutes:   r.Float64() * 10000.0,
 			})
 		}
 
