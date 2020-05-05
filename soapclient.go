@@ -412,7 +412,7 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 
 				broker.ServicesRunning, elapsed, err = s.GetRunningServiceCount(endpoint)
 				if err != nil {
-					log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getRunningServiceCount failed")
+					log.With("elapsed", elapsed).With("hostname", broker.Hostname).With("name", broker.Name).With("error", err).Debug("ServiceAdmin.getRunningServiceCount failed")
 					return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningServiceCount failed")
 				}
 				log.With("elapsed", elapsed).
@@ -423,7 +423,7 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 
 				broker.TasksRunning, elapsed, err = s.GetRunningInvocationCount(endpoint)
 				if err != nil {
-					log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getRunningInvocationCount failed")
+					log.With("elapsed", elapsed).With("hostname", broker.Hostname).With("name", broker.Name).With("error", err).Debug("ServiceAdmin.getRunningInvocationCount failed")
 					return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningInvocationCount failed")
 				}
 				log.With("elapsed", elapsed).
@@ -434,7 +434,7 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 
 				broker.TasksPending, elapsed, err = s.GetPendingInvocationCount(endpoint)
 				if err != nil {
-					log.With("elapsed", elapsed).With("error", err).Debug("ServiceAdmin.getPendingInvocationCount failed")
+					log.With("elapsed", elapsed).With("hostname", broker.Hostname).With("name", broker.Name).With("error", err).Debug("ServiceAdmin.getPendingInvocationCount failed")
 					return grid, nil, errors.Wrap(err, "ServiceAdmin.getPendingInvocationCount failed")
 				}
 				log.With("elapsed", elapsed).
