@@ -74,7 +74,7 @@ type Exporter struct {
 }
 
 // NewExporter returns an initialized Exporter.
-func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duration, directorOnly bool) (*Exporter, error) {
+func NewExporter(uri string, tlsVerify bool, schema string, timeout time.Duration, directorOnly bool) (*Exporter, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid URL")
@@ -84,14 +84,14 @@ func NewExporter(uri string, sslVerify bool, schema string, timeout time.Duratio
 	var fetch func() (GridReport, []BrokerReport, error)
 	switch u.Scheme {
 	case "http", "https":
-		client, err := NewSOAPClient(uri, sslVerify, timeout, directorOnly)
+		client, err := NewSOAPClient(uri, tlsVerify, timeout, directorOnly)
 		if err != nil {
 			log.With("error", err).Debug("SOAP client creation failed")
 			return nil, errors.Wrap(err, "SOAP client creation failed")
 		}
 		fetch = client.Fetch()
 		u.User = url.User(u.User.Username()) // Filter password from logs
-		log.With("url", u.String()).With("sslVerify", sslVerify).With("timeout", timeout).Info("Using Web Services API")
+		log.With("url", u.String()).With("tlsVerify", tlsVerify).With("timeout", timeout).Info("Using Web Services API")
 	case "postgres", "postgresql", "mssql", "sqlserver", "ora", "oracle":
 		client, err := NewSQLClient(uri, schema, timeout)
 		if err != nil {

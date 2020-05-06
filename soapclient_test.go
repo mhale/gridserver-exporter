@@ -46,7 +46,7 @@ func newBrokerInfo(hostname string, brokerID int64, busyEngineCount, driverCount
 func TestNewSOAPClient(t *testing.T) {
 	type args struct {
 		uri       string
-		sslVerify bool
+		tlsVerify bool
 		timeout   time.Duration
 	}
 	tests := []struct {
@@ -138,7 +138,7 @@ func TestNewSOAPClient(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewSOAPClient(tt.args.uri, tt.args.sslVerify, tt.args.timeout, false)
+			got, err := NewSOAPClient(tt.args.uri, tt.args.tlsVerify, tt.args.timeout, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewSOAPClient() error = %v, wantErr %v", err, tt.wantErr)
 				return

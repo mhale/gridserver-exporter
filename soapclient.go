@@ -193,7 +193,7 @@ type SOAPClient struct {
 }
 
 // NewSOAPClient returns a new SOAPClient configured for accessing a GridServer Manager.
-func NewSOAPClient(uri string, sslVerify bool, timeout time.Duration, directorOnly bool) (*SOAPClient, error) {
+func NewSOAPClient(uri string, tlsVerify bool, timeout time.Duration, directorOnly bool) (*SOAPClient, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid URL")
@@ -227,7 +227,7 @@ func NewSOAPClient(uri string, sslVerify bool, timeout time.Duration, directorOn
 		Path:   cleanPath(u.Path),
 	}
 	tlsCfg := &tls.Config{
-		InsecureSkipVerify: !sslVerify,
+		InsecureSkipVerify: !tlsVerify,
 	}
 
 	return &SOAPClient{
