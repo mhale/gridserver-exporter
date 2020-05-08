@@ -23,6 +23,8 @@ const (
 	defaultPath = "/livecluster/webservices"
 )
 
+var client *http.Client // Global client to enable connection reuse
+
 // BrokerInfo is a modified BrokerInfo SOAP type that ignores the routing-related fields.
 type BrokerInfo struct {
 	XMLName xml.Name `xml:"http://admin.gridserver.webservices.datasynapse.com getAllBrokerInfoReturn"`
@@ -230,6 +232,18 @@ func NewSOAPClient(uri string, tlsVerify bool, timeout time.Duration, directorOn
 		InsecureSkipVerify: !tlsVerify,
 	}
 
+	tr := &http.Transport{
+		TLSClientConfig: tlsCfg,
+		Dial: (&net.Dialer{
+			Timeout: timeout, // Use the user-specified timeout for the connection timeout
+		}).Dial,
+	}
+
+	client = &http.Client{
+		Transport: tr,
+		Timeout:   timeout + 10*time.Millisecond, // Ensure connection timeout fires before request timeout
+	}
+
 	return &SOAPClient{
 		URL:          director.String(),
 		Username:     username,
@@ -278,18 +292,6 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	req.Header.Add("SOAPAction", "")
 	req.Header.Set("User-Agent", "gridserver-exporter/"+version.Version)
 	req.Close = true
-
-	tr := &http.Transport{
-		TLSClientConfig: s.TLSConfig,
-		Dial: (&net.Dialer{
-			Timeout: s.Timeout, // Use the user-specified timeout for the connection timeout
-		}).Dial,
-	}
-
-	client := &http.Client{
-		Transport: tr,
-		Timeout:   s.Timeout + 10*time.Millisecond, // Ensure connection timeout fires before request timeout
-	}
 
 	// Transmit HTTP request.
 	res, err := client.Do(req)
