@@ -234,9 +234,14 @@ func NewSOAPClient(uri string, tlsVerify bool, timeout time.Duration, directorOn
 
 	tr := &http.Transport{
 		TLSClientConfig: tlsCfg,
-		Dial: (&net.Dialer{
+		DialContext: (&net.Dialer{
 			Timeout: timeout, // Use the user-specified timeout for the connection timeout
-		}).Dial,
+		}).DialContext,
+		Proxy:                 http.ProxyFromEnvironment,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
 
 	client = &http.Client{
