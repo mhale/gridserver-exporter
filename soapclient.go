@@ -291,7 +291,7 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	req.Header.Add("Content-Type", "text/xml; charset=\"utf-8\"")
 	req.Header.Add("SOAPAction", "")
 	req.Header.Set("User-Agent", "gridserver-exporter/"+version.Version)
-	req.Close = true
+	req.Close = false
 
 	// Transmit HTTP request.
 	res, err := client.Do(req)
