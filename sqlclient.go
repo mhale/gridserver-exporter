@@ -12,7 +12,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/log"
-	_ "gopkg.in/goracle.v2"
+	_ "github.com/godror/godror"
 )
 
 const (
@@ -95,7 +95,7 @@ func NewSQLClient(uri string, schema string, timeout time.Duration) (*SQLClient,
 		if len(schema) == 0 {
 			schema = u.User.Username() // Default schema on Oracle is the username
 		}
-		driver = "goracle"
+		driver = "godror"
 		// Oracle DSNs look like: user/pass@host:port/sid - note the first slash
 		password, _ := u.User.Password()
 		dsn = fmt.Sprintf("%s/%s@%s:%s%s", u.User.Username(), password, u.Hostname(), u.Port(), u.Path)

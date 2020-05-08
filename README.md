@@ -53,15 +53,15 @@ gridserver-exporter -u oracle://username:password@host/sid -s schema
 
 #### Oracle
 
-The Oracle support uses the [goracle](https://github.com/go-goracle/goracle) package.
+The Oracle support uses the [godror](https://github.com/godror/godror) package.
 
-Note that the username & password are colon-separated in the "url" parameter, not slash-separated as in the goracle package documentation.
+Note that the username & password are colon-separated in the "url" parameter, not slash-separated as in the godror package documentation.
 
 ```bash
 gridserver-exporter -u oracle://username:password@host/sid
 ```
 
-For Oracle specific options, see the [goracle Readme file](https://github.com/go-goracle/goracle/blob/master/README.md).
+For Oracle specific options, see the [godror Readme file](https://github.com/godror/godror).
 
 #### SQL Server
 
