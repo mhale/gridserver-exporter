@@ -231,7 +231,6 @@ func NewSOAPClient(uri string, tlsVerify bool, timeout time.Duration, directorOn
 	tlsCfg := &tls.Config{
 		InsecureSkipVerify: !tlsVerify,
 	}
-
 	tr := &http.Transport{
 		TLSClientConfig: tlsCfg,
 		DialContext: (&net.Dialer{
@@ -243,7 +242,6 @@ func NewSOAPClient(uri string, tlsVerify bool, timeout time.Duration, directorOn
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-
 	client = &http.Client{
 		Transport: tr,
 		Timeout:   timeout + 10*time.Millisecond, // Ensure connection timeout fires before request timeout
@@ -269,7 +267,7 @@ func cleanPath(path string) string {
 }
 
 // Call calls the requested operation.
-func (s *SOAPClient) Call(url string, request, response interface{}) error {
+func (s *SOAPClient) Call(endpoint string, request, response interface{}) error {
 	// Create SOAP request envelope.
 	envelope := SOAPEnvelope{}
 	envelope.Body.Content = request
@@ -287,9 +285,9 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	//log.With("request", reqXML).Debug("SOAP request prepared")
 
 	// Create HTTP request.
-	req, err := http.NewRequest("POST", url, buffer)
+	req, err := http.NewRequest("POST", endpoint, buffer)
 	if err != nil {
-		log.With("error", err).With("request", reqXML).With("url", url).Debug("HTTP request creation failed")
+		log.With("error", err).With("request", reqXML).With("url", endpoint).Debug("HTTP request creation failed")
 		return errors.Wrap(err, "HTTP request creation failed")
 	}
 	req.SetBasicAuth(s.Username, s.Password)
@@ -301,7 +299,23 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	// Transmit HTTP request.
 	res, err := client.Do(req)
 	if err != nil {
-		log.With("url", url).With("error", err).Debug("HTTP request failed")
+		// If UDP packets are randomly dropped e.g. due to Linux kernel bugs exposed on Kubernetes,
+		// DNS lookups will occasionally time out and the underlying error message will be "dial tcp: i/o timeout".
+		// Regular TCP connection timeout errors contain an IP address e.g. "dial tcp 127.0.0.1:8080: i/o timeout".
+		// The reason field provides some assistance to end users when debugging this problem.
+		contextLogger := log.With("url", endpoint).With("error", err)
+		if urlErr, ok := err.(*url.Error); ok {
+			if opErr, ok := urlErr.Unwrap().(*net.OpError); ok {
+				if opErr.Err.Error() == "i/o timeout" {
+					if opErr.Addr == nil {
+						contextLogger = contextLogger.With("reason", "DNS lookup timed out")
+					} else {
+						contextLogger = contextLogger.With("reason", "Connection timed out")
+					}
+				}
+			}
+		}
+		contextLogger.Debug("HTTP request failed")
 		return errors.Wrap(err, "HTTP request failed")
 	}
 	defer res.Body.Close()
@@ -309,7 +323,7 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	// Receive HTTP response.
 	rawbody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", url).Debug("HTTP response body read failed")
+		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", endpoint).Debug("HTTP response body read failed")
 		return errors.Wrap(err, "HTTP response body read failed")
 	}
 	if len(rawbody) == 0 {
@@ -323,14 +337,14 @@ func (s *SOAPClient) Call(url string, request, response interface{}) error {
 	respEnvelope.Body = SOAPBody{Content: response}
 	err = xml.Unmarshal(rawbody, respEnvelope)
 	if err != nil {
-		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", url).Debug("Received invalid SOAP response")
+		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", endpoint).Debug("Received invalid SOAP response")
 		return errors.Wrap(err, "received invalid SOAP response")
 	}
 
 	// Check for faults.
 	fault := respEnvelope.Body.Fault
 	if fault != nil {
-		log.With("fault", fault).With("request", reqXML).With("response", string(rawbody)).With("url", url).Debug("Received SOAP fault")
+		log.With("fault", fault).With("request", reqXML).With("response", string(rawbody)).With("url", endpoint).Debug("Received SOAP fault")
 		return errors.Wrap(fault, "received SOAP fault")
 	}
 
