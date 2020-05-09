@@ -107,7 +107,7 @@ gridserver-exporter -u mock://
 
 ### Building
 
-The goracle package depends on [ODPI](https://github.com/oracle/odpi), which has [installation requirements](https://oracle.github.io/odpi/doc/installation.html).
+The godror package depends on [ODPI](https://github.com/oracle/odpi), which has [installation requirements](https://oracle.github.io/odpi/doc/installation.html).
 
 The compile-time version information can be set with `ldflags`:
 
@@ -126,7 +126,7 @@ go build -ldflags "-X github.com/prometheus/common/version.Branch=$BRANCH \
 If the dependencies are vendored, `go mod vendor` will skip the `odpi` directory because it does not contain any .go files. This may be resolved with:
 
 ```bash
-go get && cp -r ~/go/pkg/mod/gopkg.in/goracle.v2*/odpi vendor/gopkg.in/goracle.v2/
+go get && cp -r ~/go/pkg/mod/github.com/godror/godror@v0.15.0/odpi vendor/github.com/godror/godror/godror@v0.15.0/
 ```
 
 ### Configuring
