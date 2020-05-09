@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"strconv"
 	"strings"
@@ -282,7 +284,7 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 
 	// Preserve request XML for later logging (Do() empties the buffer).
 	reqXML := buffer.String()
-	//log.WithField("request", reqXML).Debug("SOAP request prepared")
+	log.WithField("request", reqXML).Trace("SOAP request prepared")
 
 	// Create HTTP request.
 	req, err := http.NewRequest("POST", endpoint, buffer)
@@ -295,6 +297,58 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 	req.Header.Add("SOAPAction", "")
 	req.Header.Set("User-Agent", "gridserver-exporter/"+version.Version)
 	req.Close = false
+
+	// Tracing delays execution slightly since the calls to the logger add a tiny amount of overhead.
+	var dnsStart, connStart, tlsStart, getConn time.Time
+	trace := &httptrace.ClientTrace{
+		DNSStart: func(info httptrace.DNSStartInfo) {
+			dnsStart = time.Now()
+			log.WithField("hostname", info.Host).Trace("DNS lookup started")
+		},
+		DNSDone: func(info httptrace.DNSDoneInfo) {
+			if err != nil {
+				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).WithField("error", info.Err).Trace("DNS lookup failed")
+			} else {
+				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).Trace("DNS lookup succeeded")
+			}
+		},
+		ConnectStart: func(network, addr string) {
+			connStart = time.Now()
+			log.WithField("addr", addr).Trace("Connection started")
+		},
+		ConnectDone: func(network, addr string, err error) {
+			if err != nil {
+				log.WithField("elapsed", time.Since(connStart)).WithField("addr", addr).WithField("error", err).Trace("Connection failed")
+			} else {
+				log.WithField("elapsed", time.Since(connStart)).WithField("addr", addr).Trace("Connection succeeded")
+			}
+		},
+		GetConn: func(hostPort string) {
+			getConn = time.Now()
+			log.WithField("hostPort", hostPort).Trace("Getting connection")
+		},
+		GotConn: func(info httptrace.GotConnInfo) {
+			log.WithField("elapsed", time.Since(getConn)).WithField("localAddr", info.Conn.LocalAddr()).WithField("remoteAddr", info.Conn.RemoteAddr()).WithField("reused", info.Reused).WithField("wasIdle", info.WasIdle).WithField("idleTime", info.IdleTime).Trace("Got connection")
+		},
+		TLSHandshakeStart: func() { tlsStart = time.Now(); log.Trace("TLS handshake started") },
+		TLSHandshakeDone: func(state tls.ConnectionState, err error) {
+			log.WithField("error", err).WithField("elapsed", time.Since(tlsStart)).Trace("TLS handshake done")
+		},
+		WroteHeaders: func() { log.Trace("Wrote headers") },
+		WroteRequest: func(info httptrace.WroteRequestInfo) {
+			if err != nil {
+				log.WithField("error", info.Err).Trace("Request write failed")
+			} else {
+				log.Trace("Wrote request")
+			}
+		},
+		GotFirstResponseByte: func() { log.Trace("Got first response byte") },
+	}
+
+	// Only add the trace if requested due to the overhead.
+	if log.GetLevel() == log.TraceLevel {
+		req = req.WithContext(httptrace.WithClientTrace(context.Background(), trace))
+	}
 
 	// Transmit HTTP request.
 	res, err := client.Do(req)
@@ -330,7 +384,7 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 		return fmt.Errorf("received empty response from server")
 	}
 
-	//log.WithField("response", string(rawbody)).Debug("SOAP response received")
+	log.WithField("response", string(rawbody)).WithField("status", res.Status).Trace("SOAP response received")
 
 	// Parse SOAP response envelope.
 	respEnvelope := new(SOAPEnvelope)
