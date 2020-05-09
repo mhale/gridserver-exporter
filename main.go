@@ -17,8 +17,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-func main() {
-	const helpText = `GridServer exporter for Prometheus.
+const helpText = `GridServer exporter for Prometheus.
 
 Examples:
 		gridserver-exporter -u http://username:password@host[:port][/path]
@@ -29,27 +28,87 @@ Examples:
 		gridserver-exporter -u mock://
 
 `
-	const pidFileHelpText = `Path to GridServer Manager PID file.
+const pidFileHelpText = `Path to GridServer Manager PID file.
 If provided, the standard process metrics get exported for the Manager
 process, prefixed with 'gridserver_process_...'. The gridserver_process exporter
 needs to have read access to files owned by the Manager process. Depends on
 the availability of /proc.`
 
-	var (
-		listenAddress = kingpin.Flag("listen-address", "Address to listen on for web interface and telemetry.").Short('l').Default(":9343").Envar("GRIDSERVER_EXPORTER_LISTEN_ADDRESS").String()
-		metricsPath   = kingpin.Flag("metrics-path", "Path under which to expose metrics.").Default("/metrics").Envar("GRIDSERVER_EXPORTER_METRICS_PATH").String()
-		url           = kingpin.Flag("url", "URL for reporting database or Web Services (SOAP).").PlaceHolder("URL").Short('u').Required().Envar("GRIDSERVER_EXPORTER_URL").String()
-		tlsVerify     = kingpin.Flag("tls-verify", "Enable or disable TLS certificate verification for the Web Services URL.").Default("true").Envar("GRIDSERVER_EXPORTER_TLS_VERIFY").Bool()
-		schema        = kingpin.Flag("schema", "Schema name for reporting database.").PlaceHolder("SCHEMA").Short('s').Envar("GRIDSERVER_EXPORTER_SCHEMA").String()
-		timeout       = kingpin.Flag("timeout", "Timeout for fetching metrics in seconds.").Short('t').Default("10s").Envar("GRIDSERVER_EXPORTER_TIMEOUT").Duration()
-		once          = kingpin.Flag("once", "Fetch metrics once, then exit.").Default("false").Envar("GRIDSERVER_EXPORTER_ONCE").Bool()
-		pidFile       = kingpin.Flag("pid-file", pidFileHelpText).PlaceHolder("FILENAME").Short('p').Envar("GRIDSERVER_EXPORTER_PID_FILE").String()
-		logLevel      = kingpin.Flag("log-level", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]").Default("info").Envar("GRIDSERVER_EXPORTER_LOG_LEVEL").String()
-		logFormat     = kingpin.Flag("log-format", `Set the log format. Valid formats: [text, json]"`).Default("text").Envar("GRIDSERVER_EXPORTER_LOG_FORMAT").String()
-		logOutput     = kingpin.Flag("log-output", `Set the log output stream. Valid outputs: [stdout, stderr]`).Default("stderr").Envar("GRIDSERVER_EXPORTER_LOG_OUTPUT").String()
-		directorOnly  = kingpin.Flag("director-only", "Restrict Web Services (SOAP) calls to the Director. Per-Broker service and task metrics will not be collected.").Default("false").Envar("GRIDSERVER_EXPORTER_DIRECTOR_ONLY").Bool()
-	)
+var (
+	listenAddress = kingpin.Flag("listen-address", "Address to listen on for web interface and telemetry.").Short('l').Default(":9343").Envar("GRIDSERVER_EXPORTER_LISTEN_ADDRESS").String()
+	metricsPath   = kingpin.Flag("metrics-path", "Path under which to expose metrics.").Default("/metrics").Envar("GRIDSERVER_EXPORTER_METRICS_PATH").String()
+	sourceURL     = kingpin.Flag("url", "URL for reporting database or Web Services (SOAP).").PlaceHolder("URL").Short('u').Required().Envar("GRIDSERVER_EXPORTER_URL").String()
+	tlsVerify     = kingpin.Flag("tls-verify", "Enable or disable TLS certificate verification for the Web Services URL.").Default("true").Envar("GRIDSERVER_EXPORTER_TLS_VERIFY").Bool()
+	schema        = kingpin.Flag("schema", "Schema name for reporting database.").PlaceHolder("SCHEMA").Short('s').Envar("GRIDSERVER_EXPORTER_SCHEMA").String()
+	timeout       = kingpin.Flag("timeout", "Timeout for fetching metrics in seconds.").Short('t').Default("10s").Envar("GRIDSERVER_EXPORTER_TIMEOUT").Duration()
+	once          = kingpin.Flag("once", "Fetch metrics once, then exit.").Default("false").Envar("GRIDSERVER_EXPORTER_ONCE").Bool()
+	pidFile       = kingpin.Flag("pid-file", pidFileHelpText).PlaceHolder("FILENAME").Short('p').Envar("GRIDSERVER_EXPORTER_PID_FILE").String()
+	logLevel      = kingpin.Flag("log-level", "Only log messages with the given severity or above. Valid levels: [fatal, error, warn, info, debug, trace]").Default("info").Envar("GRIDSERVER_EXPORTER_LOG_LEVEL").String()
+	logFormat     = kingpin.Flag("log-format", `Set the log format. Valid formats: [text, json]"`).Default("text").Envar("GRIDSERVER_EXPORTER_LOG_FORMAT").String()
+	logOutput     = kingpin.Flag("log-output", `Set the log output stream. Valid outputs: [stdout, stderr]`).Default("stderr").Envar("GRIDSERVER_EXPORTER_LOG_OUTPUT").String()
+	directorOnly  = kingpin.Flag("director-only", "Restrict Web Services (SOAP) calls to the Director. Per-Broker service and task metrics will not be collected.").Default("false").Envar("GRIDSERVER_EXPORTER_DIRECTOR_ONLY").Bool()
+)
 
+// Middleware for logging hits to the web server.
+func logMiddleware(h http.Handler) http.Handler {
+	return logFunc(h.ServeHTTP)
+}
+
+func logFunc(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.WithField("remoteAddr", r.RemoteAddr).WithField("method", r.Method).WithField("url", r.URL.String()).WithField("host", r.Host).Debug("Exporter web server hit")
+		h.ServeHTTP(w, r)
+	})
+}
+
+// Handler for index page.
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		newLevel := r.FormValue("level")
+		level, err := log.ParseLevel(newLevel)
+		if err != nil {
+			log.WithField("level", newLevel).Error("Log level override failed")
+		} else {
+			log.SetLevel(level)
+			oldLevel := *logLevel
+			*logLevel = newLevel
+			log.WithField("oldLevel", oldLevel).WithField("newLevel", newLevel).Info("Log level override succeeded")
+		}
+	}
+	optionsHTML := ""
+	logLevels := []string{"fatal", "error", "warn", "info", "debug", "trace"}
+	for _, level := range logLevels {
+		if *logLevel == level {
+			optionsHTML += "<option selected>" + level + "</option>"
+		} else {
+			optionsHTML += "<option>" + level + "</option>"
+		}
+	}
+	w.Write([]byte(`<!doctype html>
+		<html lang="en-US">
+		<head>
+			<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+			<title>GridServer Exporter for Prometheus</title>
+		</head>
+		<body>
+			<h1>GridServer Exporter for Prometheus</h1>
+			<p><a href="` + *metricsPath + `">Metrics</a></p>
+			<form action="" method="post">
+				<p>
+					<label>Log Level:</label>
+					&nbsp;
+					<select name="level">
+						` + optionsHTML + `
+					</select>
+					&nbsp;
+					<button>Apply</button>
+				</p>
+			</form>
+		</body>
+		</html>`))
+}
+
+func main() {
 	kingpin.Version(version.Print("gridserver-exporter"))
 	kingpin.CommandLine.Help = helpText
 	kingpin.HelpFlag.Short('h')
@@ -93,7 +152,7 @@ the availability of /proc.`
 		WithField("revision", version.Revision).
 		Debug("Build context")
 
-	exporter, err := NewExporter(*url, *tlsVerify, *schema, *timeout, *directorOnly)
+	exporter, err := NewExporter(*sourceURL, *tlsVerify, *schema, *timeout, *directorOnly)
 	if err != nil {
 		log.WithField("error", err).Fatal("Start failed")
 	}
@@ -148,53 +207,9 @@ the availability of /proc.`
 	}
 
 	// Configure web server to be both browser and Prometheus friendly.
-	http.Handle(*metricsPath, promhttp.Handler())
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			newLevel := r.FormValue("level")
-			level, err := log.ParseLevel(newLevel)
-			if err != nil {
-				log.WithField("level", newLevel).Error("Log level override failed")
-			} else {
-				log.SetLevel(level)
-				oldLevel := *logLevel
-				*logLevel = newLevel
-				log.WithField("oldLevel", oldLevel).WithField("newLevel", newLevel).Info("Log level override succeeded")
-			}
-		}
-		optionsHTML := ""
-		logLevels := []string{"debug", "info", "warn", "error", "fatal"}
-		for _, level := range logLevels {
-			if *logLevel == level {
-				optionsHTML += "<option selected>" + level + "</option>"
-			} else {
-				optionsHTML += "<option>" + level + "</option>"
-			}
-		}
-		w.Write([]byte(`<!doctype html>
-			<html lang="en-US">
-			<head>
-				<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-				<title>GridServer Exporter for Prometheus</title>
-			</head>
-			<body>
-				<h1>GridServer Exporter for Prometheus</h1>
-				<p><a href="` + *metricsPath + `">Metrics</a></p>
-				<form action="" method="post">
-					<p>
-						<label>Log Level:</label>
-						&nbsp;
-						<select name="level">
-							` + optionsHTML + `
-						</select>
-						&nbsp;
-						<button>Apply</button>
-					</p>
-				</form>
-            </body>
-            </html>`))
-	})
-	http.Handle("/favicon.ico", http.NotFoundHandler())
+	http.Handle(*metricsPath, logMiddleware(promhttp.Handler()))
+	http.HandleFunc("/", logFunc(indexHandler))
+	http.Handle("/favicon.ico", logMiddleware(http.NotFoundHandler()))
 
 	log.WithField("address", *listenAddress).WithField("path", *metricsPath).Info("Listening on network")
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
