@@ -9,10 +9,10 @@ import (
 	"time"
 
 	_ "github.com/denisenkom/go-mssqldb"
+	_ "github.com/godror/godror"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
-	"github.com/prometheus/common/log"
-	_ "github.com/godror/godror"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -105,7 +105,7 @@ func NewSQLClient(uri string, schema string, timeout time.Duration) (*SQLClient,
 
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
-		log.With("driver", driver).With("error", err).Debug("Database client creation failed")
+		log.WithField("driver", driver).WithField("error", err).Debug("Database client creation failed")
 		return nil, errors.Wrap(err, "database client creation failed")
 	}
 
@@ -129,10 +129,10 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		err := s.db.Ping()
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("error", err).Debug("Database connection failed")
+			log.WithField("elapsed", elapsed).WithField("error", err).Debug("Database connection failed")
 			return grid, nil, errors.Wrap(err, "database connection failed")
 		}
-		log.With("elapsed", elapsed).Debug("Database connection succeeded")
+		log.WithField("elapsed", elapsed).Debug("Database connection succeeded")
 
 		query := fmt.Sprintf(queryTmpl, s.Schema)        // Insert the schema
 		query = strings.Join(strings.Fields(query), " ") // Remove the line breaks and tabs for logs
@@ -141,11 +141,11 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		rows, err := s.db.Query(query)
 		elapsed = time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("error", err).With("sql", query).Debug("SQL query failed")
+			log.WithField("elapsed", elapsed).WithField("error", err).WithField("sql", query).Debug("SQL query failed")
 			return grid, nil, errors.Wrap(err, "SQL query failed")
 		}
 		defer rows.Close()
-		log.With("elapsed", elapsed).Debug("SQL query succeeded")
+		log.WithField("elapsed", elapsed).Debug("SQL query succeeded")
 
 		for rows.Next() {
 			var brokerID int
@@ -155,7 +155,7 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 
 			err = rows.Scan(&brokerID, &brokerURL, &r.Name, &r.BusyEngines, &r.TotalEngines, &r.Drivers, &r.UptimeMinutes, &r.ServicesRunning, &r.TasksPending, &ts)
 			if err != nil {
-				log.With("error", err).Debug("Row scan failed")
+				log.WithField("error", err).Debug("Row scan failed")
 				return grid, nil, errors.Wrap(err, "row scan failed")
 			}
 
@@ -171,12 +171,12 @@ func (s *SQLClient) Fetch() func() (GridReport, []BrokerReport, error) {
 			// This is likely to be a transient error e.g. during a reboot.
 			age := time.Since(ts).Round(time.Second)
 			if age > 1*time.Minute {
-				log.With("age", age).With("hostname", r.Hostname).With("name", r.Name).With("id", brokerID).Warn("Most recent report for Broker is more than 60 seconds old")
+				log.WithField("age", age).WithField("hostname", r.Hostname).WithField("name", r.Name).WithField("id", brokerID).Warn("Most recent report for Broker is more than 60 seconds old")
 			}
 		}
 		err = rows.Err()
 		if err != nil {
-			log.With("error", err).Debug("Row processing failed")
+			log.WithField("error", err).Debug("Row processing failed")
 			return grid, nil, errors.Wrap(err, "row processing failed")
 		}
 

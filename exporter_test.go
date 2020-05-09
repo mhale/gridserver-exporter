@@ -9,13 +9,13 @@ import (
 
 	"github.com/go-test/deep"
 	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func init() {
-	log.Base().SetLevel("FATAL") // Suppress log messages during tests
+	log.SetLevel(log.FatalLevel) // Suppress log messages during tests
 	deep.CompareUnexportedFields = true
 }
 

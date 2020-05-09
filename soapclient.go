@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -282,12 +282,12 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 
 	// Preserve request XML for later logging (Do() empties the buffer).
 	reqXML := buffer.String()
-	//log.With("request", reqXML).Debug("SOAP request prepared")
+	//log.WithField("request", reqXML).Debug("SOAP request prepared")
 
 	// Create HTTP request.
 	req, err := http.NewRequest("POST", endpoint, buffer)
 	if err != nil {
-		log.With("error", err).With("request", reqXML).With("url", endpoint).Debug("HTTP request creation failed")
+		log.WithField("error", err).WithField("request", reqXML).WithField("url", endpoint).Debug("HTTP request creation failed")
 		return errors.Wrap(err, "HTTP request creation failed")
 	}
 	req.SetBasicAuth(s.Username, s.Password)
@@ -303,14 +303,14 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 		// DNS lookups will occasionally time out and the underlying error message will be "dial tcp: i/o timeout".
 		// Regular TCP connection timeout errors contain an IP address e.g. "dial tcp 127.0.0.1:8080: i/o timeout".
 		// The reason field provides some assistance to end users when debugging this problem.
-		contextLogger := log.With("url", endpoint).With("error", err)
+		contextLogger := log.WithField("url", endpoint).WithField("error", err)
 		if urlErr, ok := err.(*url.Error); ok {
 			if opErr, ok := urlErr.Unwrap().(*net.OpError); ok {
 				if opErr.Err.Error() == "i/o timeout" {
 					if opErr.Addr == nil {
-						contextLogger = contextLogger.With("reason", "DNS lookup timed out")
+						contextLogger = contextLogger.WithField("reason", "DNS lookup timed out")
 					} else {
-						contextLogger = contextLogger.With("reason", "Connection timed out")
+						contextLogger = contextLogger.WithField("reason", "Connection timed out")
 					}
 				}
 			}
@@ -323,28 +323,28 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 	// Receive HTTP response.
 	rawbody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", endpoint).Debug("HTTP response body read failed")
+		log.WithField("error", err).WithField("request", reqXML).WithField("response", string(rawbody)).WithField("url", endpoint).Debug("HTTP response body read failed")
 		return errors.Wrap(err, "HTTP response body read failed")
 	}
 	if len(rawbody) == 0 {
 		return fmt.Errorf("received empty response from server")
 	}
 
-	//log.With("response", string(rawbody)).Debug("SOAP response received")
+	//log.WithField("response", string(rawbody)).Debug("SOAP response received")
 
 	// Parse SOAP response envelope.
 	respEnvelope := new(SOAPEnvelope)
 	respEnvelope.Body = SOAPBody{Content: response}
 	err = xml.Unmarshal(rawbody, respEnvelope)
 	if err != nil {
-		log.With("error", err).With("request", reqXML).With("response", string(rawbody)).With("url", endpoint).Debug("Received invalid SOAP response")
+		log.WithField("error", err).WithField("request", reqXML).WithField("response", string(rawbody)).WithField("url", endpoint).Debug("Received invalid SOAP response")
 		return errors.Wrap(err, "received invalid SOAP response")
 	}
 
 	// Check for faults.
 	fault := respEnvelope.Body.Fault
 	if fault != nil {
-		log.With("fault", fault).With("request", reqXML).With("response", string(rawbody)).With("url", endpoint).Debug("Received SOAP fault")
+		log.WithField("fault", fault).WithField("request", reqXML).WithField("response", string(rawbody)).WithField("url", endpoint).Debug("Received SOAP fault")
 		return errors.Wrap(fault, "received SOAP fault")
 	}
 
@@ -411,10 +411,10 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 		// Get the Brokers and their basic metrics from the Director.
 		brokerInfos, elapsed, err := s.GetAllBrokerInfo()
 		if err != nil {
-			log.With("elapsed", elapsed).With("hostname", hostname).With("error", err).Debug("BrokerAdmin.getAllBrokerInfo failed")
+			log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("error", err).Debug("BrokerAdmin.getAllBrokerInfo failed")
 			return grid, nil, errors.Wrap(err, "BrokerAdmin.getAllBrokerInfo failed")
 		}
-		log.With("elapsed", elapsed).With("hostname", hostname).With("brokers", len(brokerInfos)).Debug("BrokerAdmin.getAllBrokerInfo succeeded")
+		log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("brokers", len(brokerInfos)).Debug("BrokerAdmin.getAllBrokerInfo succeeded")
 
 		for _, brokerInfo := range brokerInfos {
 			baseURL, _ := url.Parse(brokerInfo.BaseURL)
@@ -436,35 +436,35 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 
 				broker.ServicesRunning, elapsed, err = s.GetRunningServiceCount(endpoint)
 				if err != nil {
-					log.With("elapsed", elapsed).With("hostname", broker.Hostname).With("name", broker.Name).With("error", err).Debug("ServiceAdmin.getRunningServiceCount failed")
+					log.WithField("elapsed", elapsed).WithField("hostname", broker.Hostname).WithField("name", broker.Name).WithField("error", err).Debug("ServiceAdmin.getRunningServiceCount failed")
 					return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningServiceCount failed")
 				}
-				log.With("elapsed", elapsed).
-					With("hostname", broker.Hostname).
-					With("name", broker.Name).
-					With("servicesRunning", broker.ServicesRunning).
+				log.WithField("elapsed", elapsed).
+					WithField("hostname", broker.Hostname).
+					WithField("name", broker.Name).
+					WithField("servicesRunning", broker.ServicesRunning).
 					Debug("ServiceAdmin.getRunningServiceCount succeeded")
 
 				broker.TasksRunning, elapsed, err = s.GetRunningInvocationCount(endpoint)
 				if err != nil {
-					log.With("elapsed", elapsed).With("hostname", broker.Hostname).With("name", broker.Name).With("error", err).Debug("ServiceAdmin.getRunningInvocationCount failed")
+					log.WithField("elapsed", elapsed).WithField("hostname", broker.Hostname).WithField("name", broker.Name).WithField("error", err).Debug("ServiceAdmin.getRunningInvocationCount failed")
 					return grid, nil, errors.Wrap(err, "ServiceAdmin.getRunningInvocationCount failed")
 				}
-				log.With("elapsed", elapsed).
-					With("hostname", broker.Hostname).
-					With("name", broker.Name).
-					With("tasksRunning", broker.TasksRunning).
+				log.WithField("elapsed", elapsed).
+					WithField("hostname", broker.Hostname).
+					WithField("name", broker.Name).
+					WithField("tasksRunning", broker.TasksRunning).
 					Debug("ServiceAdmin.getRunningInvocationCount succeeded")
 
 				broker.TasksPending, elapsed, err = s.GetPendingInvocationCount(endpoint)
 				if err != nil {
-					log.With("elapsed", elapsed).With("hostname", broker.Hostname).With("name", broker.Name).With("error", err).Debug("ServiceAdmin.getPendingInvocationCount failed")
+					log.WithField("elapsed", elapsed).WithField("hostname", broker.Hostname).WithField("name", broker.Name).WithField("error", err).Debug("ServiceAdmin.getPendingInvocationCount failed")
 					return grid, nil, errors.Wrap(err, "ServiceAdmin.getPendingInvocationCount failed")
 				}
-				log.With("elapsed", elapsed).
-					With("hostname", broker.Hostname).
-					With("name", broker.Name).
-					With("tasksPending", broker.TasksPending).
+				log.WithField("elapsed", elapsed).
+					WithField("hostname", broker.Hostname).
+					WithField("name", broker.Name).
+					WithField("tasksPending", broker.TasksPending).
 					Debug("ServiceAdmin.getPendingInvocationCount succeeded")
 			}
 
@@ -492,24 +492,24 @@ func (s *SOAPClient) Fetch() func() (GridReport, []BrokerReport, error) {
 
 			grid.ServicesRunning, elapsed, err = s.GetRunningServiceCount(endpoint)
 			if err != nil {
-				log.With("elapsed", elapsed).With("hostname", hostname).With("error", err).Debug("ManagerAdmin.getRunningServiceCount failed")
+				log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("error", err).Debug("ManagerAdmin.getRunningServiceCount failed")
 				return grid, nil, errors.Wrap(err, "ManagerAdmin.getRunningServiceCount failed")
 			}
-			log.With("elapsed", elapsed).With("hostname", hostname).With("servicesRunning", grid.ServicesRunning).Debug("ManagerAdmin.getRunningServiceCount succeeded")
+			log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("servicesRunning", grid.ServicesRunning).Debug("ManagerAdmin.getRunningServiceCount succeeded")
 
 			grid.TasksRunning, elapsed, err = s.GetRunningInvocationCount(endpoint)
 			if err != nil {
-				log.With("elapsed", elapsed).With("hostname", hostname).With("error", err).Debug("ManagerAdmin.getRunningInvocationCount failed")
+				log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("error", err).Debug("ManagerAdmin.getRunningInvocationCount failed")
 				return grid, nil, errors.Wrap(err, "ManagerAdmin.getRunningInvocationCount failed")
 			}
-			log.With("elapsed", elapsed).With("hostname", hostname).With("tasksRunning", grid.TasksRunning).Debug("ManagerAdmin.getRunningInvocationCount succeeded")
+			log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("tasksRunning", grid.TasksRunning).Debug("ManagerAdmin.getRunningInvocationCount succeeded")
 
 			grid.TasksPending, elapsed, err = s.GetPendingInvocationCount(endpoint)
 			if err != nil {
-				log.With("elapsed", elapsed).With("hostname", hostname).With("error", err).Debug("ManagerAdmin.getPendingInvocationCount failed")
+				log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("error", err).Debug("ManagerAdmin.getPendingInvocationCount failed")
 				return grid, nil, errors.Wrap(err, "ManagerAdmin.getPendingInvocationCount failed")
 			}
-			log.With("elapsed", elapsed).With("hostname", hostname).With("tasksPending", grid.TasksPending).Debug("ManagerAdmin.getPendingInvocationCount succeeded")
+			log.WithField("elapsed", elapsed).WithField("hostname", hostname).WithField("tasksPending", grid.TasksPending).Debug("ManagerAdmin.getPendingInvocationCount succeeded")
 		}
 
 		return grid, brokers, nil

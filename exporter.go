@@ -9,7 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -86,21 +86,21 @@ func NewExporter(uri string, tlsVerify bool, schema string, timeout time.Duratio
 	case "http", "https":
 		client, err := NewSOAPClient(uri, tlsVerify, timeout, directorOnly)
 		if err != nil {
-			log.With("error", err).Debug("SOAP client creation failed")
+			log.WithField("error", err).Debug("SOAP client creation failed")
 			return nil, errors.Wrap(err, "SOAP client creation failed")
 		}
 		fetch = client.Fetch()
 		u.User = url.User(u.User.Username()) // Filter password from logs
-		log.With("url", u.String()).With("tlsVerify", tlsVerify).With("timeout", timeout).Info("Using Web Services API")
+		log.WithField("url", u.String()).WithField("tlsVerify", tlsVerify).WithField("timeout", timeout).Info("Using Web Services API")
 	case "postgres", "postgresql", "mssql", "sqlserver", "ora", "oracle":
 		client, err := NewSQLClient(uri, schema, timeout)
 		if err != nil {
-			log.With("error", err).Debug("SQL client creation failed")
+			log.WithField("error", err).Debug("SQL client creation failed")
 			return nil, errors.Wrap(err, "SQL client creation failed")
 		}
 		fetch = client.Fetch()
 		u.User = url.User(u.User.Username()) // Filter password from logs
-		log.With("url", u.String()).With("driver", client.Driver).With("schema", client.Schema).Info("Using reporting database")
+		log.WithField("url", u.String()).WithField("driver", client.Driver).WithField("schema", client.Schema).Info("Using reporting database")
 	case "mock":
 		client := NewMockClient()
 		fetch = client.Fetch()
@@ -184,19 +184,19 @@ func (e *Exporter) scrape() {
 	if err != nil {
 		e.up.Set(0)
 		e.failedScrapes.Inc()
-		log.With("elapsed", elapsed).With("error", err).Error("Scrape failed")
+		log.WithField("elapsed", elapsed).WithField("error", err).Error("Scrape failed")
 		return
 	}
 	e.up.Set(1)
 
-	log.With("elapsed", elapsed).
-		With("brokers", len(brokers)).
-		With("busyEngines", grid.BusyEngines).
-		With("totalEngines", grid.TotalEngines).
-		With("drivers", grid.Drivers).
-		With("servicesRunning", grid.ServicesRunning).
-		With("tasksRunning", grid.TasksRunning).
-		With("tasksPending", grid.TasksPending).
+	log.WithField("elapsed", elapsed).
+		WithField("brokers", len(brokers)).
+		WithField("busyEngines", grid.BusyEngines).
+		WithField("totalEngines", grid.TotalEngines).
+		WithField("drivers", grid.Drivers).
+		WithField("servicesRunning", grid.ServicesRunning).
+		WithField("tasksRunning", grid.TasksRunning).
+		WithField("tasksPending", grid.TasksPending).
 		Info("Scrape succeeded")
 
 	e.gridMetrics["busy_engines"].Set(float64(grid.BusyEngines))
@@ -230,15 +230,15 @@ func (e *Exporter) scrape() {
 			e.brokerMetrics["uptime_minutes"].WithLabelValues(broker.Name, broker.Hostname).Set(float64(broker.UptimeMinutes))
 		}
 
-		log.With("hostname", broker.Hostname).
-			With("name", broker.Name).
-			With("busyEngines", broker.BusyEngines).
-			With("totalEngines", broker.TotalEngines).
-			With("drivers", broker.Drivers).
-			With("servicesRunning", broker.ServicesRunning).
-			With("tasksRunning", broker.TasksRunning).
-			With("tasksPending", broker.TasksPending).
-			With("uptimeMinutes", broker.UptimeMinutes).
+		log.WithField("hostname", broker.Hostname).
+			WithField("name", broker.Name).
+			WithField("busyEngines", broker.BusyEngines).
+			WithField("totalEngines", broker.TotalEngines).
+			WithField("drivers", broker.Drivers).
+			WithField("servicesRunning", broker.ServicesRunning).
+			WithField("tasksRunning", broker.TasksRunning).
+			WithField("tasksPending", broker.TasksPending).
+			WithField("uptimeMinutes", broker.UptimeMinutes).
 			Debug("Broker metrics processed")
 	}
 }

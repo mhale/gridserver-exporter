@@ -3,6 +3,7 @@ package main
 import (
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -10,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/procfs"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -44,7 +45,8 @@ the availability of /proc.`
 		once          = kingpin.Flag("once", "Fetch metrics once, then exit.").Default("false").Envar("GRIDSERVER_EXPORTER_ONCE").Bool()
 		pidFile       = kingpin.Flag("pid-file", pidFileHelpText).PlaceHolder("FILENAME").Short('p').Envar("GRIDSERVER_EXPORTER_PID_FILE").String()
 		logLevel      = kingpin.Flag("log-level", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]").Default("info").Envar("GRIDSERVER_EXPORTER_LOG_LEVEL").String()
-		logFormat     = kingpin.Flag("log-format", `Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true"`).Default("logger:stderr").Envar("GRIDSERVER_EXPORTER_LOG_FORMAT").String()
+		logFormat     = kingpin.Flag("log-format", `Set the log format. Valid formats: [text, json]"`).Default("text").Envar("GRIDSERVER_EXPORTER_LOG_FORMAT").String()
+		logOutput     = kingpin.Flag("log-output", `Set the log output stream. Valid outputs: [stdout, stderr]`).Default("stderr").Envar("GRIDSERVER_EXPORTER_LOG_OUTPUT").String()
 		directorOnly  = kingpin.Flag("director-only", "Restrict Web Services (SOAP) calls to the Director. Per-Broker service and task metrics will not be collected.").Default("false").Envar("GRIDSERVER_EXPORTER_DIRECTOR_ONLY").Bool()
 	)
 
@@ -53,27 +55,47 @@ the availability of /proc.`
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	err := log.Base().SetFormat(*logFormat)
-	if err != nil {
-		log.With("format", *logFormat).With("error", err).Fatal("Invalid log format")
+	switch *logOutput {
+	case "stderr":
+		log.SetOutput(os.Stderr)
+	case "stdout":
+		log.SetOutput(os.Stdout)
+	default:
+		log.WithField("output", *logOutput).Fatal("Invalid log output stream")
 	}
 
-	err = log.Base().SetLevel(*logLevel)
-	if err != nil {
-		log.With("level", *logLevel).With("error", err).Fatal("Invalid log level")
+	switch *logFormat {
+	case "text":
+		log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
+	case "json":
+		log.SetFormatter(&log.JSONFormatter{})
+	default:
+		log.WithField("format", *logFormat).Fatal("Invalid log format")
 	}
 
-	log.With("version", version.Version).Info("Starting GridServer Exporter")
-	log.With("go", version.GoVersion).
-		With("user", version.BuildUser).
-		With("date", version.BuildDate).
-		With("branch", version.Branch).
-		With("revision", version.Revision).
+	switch *logLevel {
+	case "panic":
+		log.WithField("level", *logLevel).Fatal("Invalid log level")
+	default:
+		level, err := log.ParseLevel(*logLevel)
+		if err != nil {
+			log.WithField("level", *logLevel).Fatal("Invalid log level")
+		} else {
+			log.SetLevel(level)
+		}
+	}
+
+	log.WithField("version", version.Version).Info("Starting GridServer Exporter")
+	log.WithField("go", version.GoVersion).
+		WithField("user", version.BuildUser).
+		WithField("date", version.BuildDate).
+		WithField("branch", version.Branch).
+		WithField("revision", version.Revision).
 		Debug("Build context")
 
 	exporter, err := NewExporter(*url, *tlsVerify, *schema, *timeout, *directorOnly)
 	if err != nil {
-		log.With("error", err).Fatal("Start failed")
+		log.WithField("error", err).Fatal("Start failed")
 	}
 
 	// Fetch statistics once and exit if requested.
@@ -82,16 +104,16 @@ the availability of /proc.`
 		grid, brokers, err := exporter.Fetch()
 		elapsed := time.Since(start).Round(time.Millisecond)
 		if err != nil {
-			log.With("elapsed", elapsed).With("error", err).Error("Scrape failed")
+			log.WithField("elapsed", elapsed).WithField("error", err).Error("Scrape failed")
 		} else {
-			log.With("elapsed", elapsed).
-				With("brokers", len(brokers)).
-				With("busyEngines", grid.BusyEngines).
-				With("drivers", grid.Drivers).
-				With("servicesRunning", grid.ServicesRunning).
-				With("tasksPending", grid.TasksPending).
-				With("tasksRunning", grid.TasksRunning).
-				With("totalEngines", grid.TotalEngines).
+			log.WithField("elapsed", elapsed).
+				WithField("brokers", len(brokers)).
+				WithField("busyEngines", grid.BusyEngines).
+				WithField("drivers", grid.Drivers).
+				WithField("servicesRunning", grid.ServicesRunning).
+				WithField("tasksPending", grid.TasksPending).
+				WithField("tasksRunning", grid.TasksRunning).
+				WithField("totalEngines", grid.TotalEngines).
 				Info("Scrape succeeded")
 		}
 		return
@@ -109,12 +131,12 @@ the availability of /proc.`
 				PidFn: func() (int, error) {
 					content, err := ioutil.ReadFile(*pidFile)
 					if err != nil {
-						log.With("pidfile", *pidFile).With("error", err).Error("PID file read failed")
+						log.WithField("pidfile", *pidFile).WithField("error", err).Error("PID file read failed")
 						return 0, errors.Wrap(err, "PID file read failed")
 					}
 					value, err := strconv.Atoi(strings.TrimSpace(string(content)))
 					if err != nil {
-						log.With("pidfile", *pidFile).With("error", err).Error("PID file parse failed")
+						log.WithField("pidfile", *pidFile).WithField("error", err).Error("PID file parse failed")
 						return 0, errors.Wrap(err, "PID file parse failed")
 					}
 					return value, nil
@@ -129,14 +151,15 @@ the availability of /proc.`
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			level := r.FormValue("level")
-			err := log.Base().SetLevel(level)
+			newLevel := r.FormValue("level")
+			level, err := log.ParseLevel(newLevel)
 			if err != nil {
-				log.With("error", err).Error("Log level override failed")
+				log.WithField("level", newLevel).Error("Log level override failed")
 			} else {
+				log.SetLevel(level)
 				oldLevel := *logLevel
-				*logLevel = level
-				log.With("oldLevel", oldLevel).With("newLevel", level).Info("Log level override succeeded")
+				*logLevel = newLevel
+				log.WithField("oldLevel", oldLevel).WithField("newLevel", newLevel).Info("Log level override succeeded")
 			}
 		}
 		optionsHTML := ""
@@ -173,6 +196,6 @@ the availability of /proc.`
 	})
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
-	log.With("address", *listenAddress).With("path", *metricsPath).Info("Listening on network")
+	log.WithField("address", *listenAddress).WithField("path", *metricsPath).Info("Listening on network")
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
