@@ -56,7 +56,7 @@ func logMiddleware(h http.Handler) http.Handler {
 
 func logFunc(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.WithField("remoteAddr", r.RemoteAddr).WithField("method", r.Method).WithField("url", r.URL.String()).WithField("host", r.Host).Debug("Exporter web server hit")
+		log.WithField("remoteAddr", r.RemoteAddr).WithField("method", r.Method).WithField("url", r.URL.String()).WithField("host", r.Host).WithField("userAgent", r.UserAgent()).Debug("Exporter web server hit")
 		h.ServeHTTP(w, r)
 	})
 }
