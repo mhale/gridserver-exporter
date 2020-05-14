@@ -50,11 +50,11 @@ var (
 )
 
 // Middleware for logging hits to the web server.
-func logMiddleware(h http.Handler) http.Handler {
-	return logFunc(h.ServeHTTP)
+func loggingHandler(h http.Handler) http.Handler {
+	return loggingHandlerFunc(h.ServeHTTP)
 }
 
-func logFunc(h http.HandlerFunc) http.HandlerFunc {
+func loggingHandlerFunc(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.WithField("remoteAddr", r.RemoteAddr).WithField("method", r.Method).WithField("url", r.URL.String()).WithField("host", r.Host).WithField("userAgent", r.UserAgent()).Debug("Exporter web server hit")
 		h.ServeHTTP(w, r)
@@ -207,9 +207,9 @@ func main() {
 	}
 
 	// Configure web server to be both browser and Prometheus friendly.
-	http.Handle(*metricsPath, logMiddleware(promhttp.Handler()))
-	http.HandleFunc("/", logFunc(indexHandler))
-	http.Handle("/favicon.ico", logMiddleware(http.NotFoundHandler()))
+	http.Handle(*metricsPath, loggingHandler(promhttp.Handler()))
+	http.HandleFunc("/", loggingHandlerFunc(indexHandler))
+	http.Handle("/favicon.ico", loggingHandler(http.NotFoundHandler()))
 
 	log.WithField("address", *listenAddress).WithField("path", *metricsPath).Info("Listening on network")
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
