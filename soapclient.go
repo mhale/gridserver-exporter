@@ -332,7 +332,11 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 		},
 		TLSHandshakeStart: func() { tlsStart = time.Now(); log.Trace("TLS handshake started") },
 		TLSHandshakeDone: func(state tls.ConnectionState, err error) {
-			log.WithField("error", err).WithField("elapsed", time.Since(tlsStart)).Trace("TLS handshake done")
+			if err != nil {
+				log.WithField("elapsed", time.Since(tlsStart)).WithField("error", err).Trace("TLS handshake failed")
+			} else {
+				log.WithField("elapsed", time.Since(tlsStart)).Trace("TLS handshake succeeded")
+			}
 		},
 		WroteHeaders: func() { log.Trace("Wrote headers") },
 		WroteRequest: func(info httptrace.WroteRequestInfo) {
