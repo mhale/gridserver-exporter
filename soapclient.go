@@ -336,7 +336,7 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 		},
 		WroteHeaders: func() { log.Trace("Wrote headers") },
 		WroteRequest: func(info httptrace.WroteRequestInfo) {
-			if err != nil {
+			if info.Err != nil {
 				log.WithField("error", info.Err).Trace("Request write failed")
 			} else {
 				log.Trace("Wrote request")
