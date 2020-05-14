@@ -308,7 +308,7 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 			log.WithField("hostname", info.Host).Trace("DNS lookup started")
 		},
 		DNSDone: func(info httptrace.DNSDoneInfo) {
-			if err != nil {
+			if info.Err != nil {
 				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).WithField("hostname", hostname).WithField("error", info.Err).Trace("DNS lookup failed")
 			} else {
 				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).WithField("hostname", hostname).Trace("DNS lookup succeeded")
