@@ -300,16 +300,18 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 
 	// Tracing delays execution slightly since the calls to the logger add a tiny amount of overhead.
 	var dnsStart, connStart, tlsStart, getConn time.Time
+	var hostname string
 	trace := &httptrace.ClientTrace{
 		DNSStart: func(info httptrace.DNSStartInfo) {
 			dnsStart = time.Now()
+			hostname = info.Host
 			log.WithField("hostname", info.Host).Trace("DNS lookup started")
 		},
 		DNSDone: func(info httptrace.DNSDoneInfo) {
 			if err != nil {
-				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).WithField("error", info.Err).Trace("DNS lookup failed")
+				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).WithField("hostname", hostname).WithField("error", info.Err).Trace("DNS lookup failed")
 			} else {
-				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).Trace("DNS lookup succeeded")
+				log.WithField("elapsed", time.Since(dnsStart)).WithField("addrs", info.Addrs).WithField("hostname", hostname).Trace("DNS lookup succeeded")
 			}
 		},
 		ConnectStart: func(network, addr string) {
