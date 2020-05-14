@@ -240,7 +240,7 @@ func NewSOAPClient(uri string, tlsVerify bool, timeout time.Duration, directorOn
 		}).DialContext,
 		Proxy:                 http.ProxyFromEnvironment,
 		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
+		IdleConnTimeout:       30 * time.Second, // Force idle connections to time out between scrapes
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
