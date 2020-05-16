@@ -366,7 +366,7 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 		contextLogger := log.WithField("url", endpoint).WithField("error", err)
 		if urlErr, ok := err.(*url.Error); ok {
 			if opErr, ok := urlErr.Unwrap().(*net.OpError); ok {
-				if opErr.Err.Error() == "i/o timeout" {
+				if opErr.Timeout() {
 					if opErr.Addr == nil {
 						contextLogger = contextLogger.WithField("reason", "DNS lookup timed out")
 					} else {
