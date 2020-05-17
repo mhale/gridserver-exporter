@@ -365,8 +365,8 @@ func (s *SOAPClient) Call(endpoint string, request, response interface{}) error 
 		// The reason field provides some assistance to end users when debugging this problem.
 		contextLogger := log.WithField("url", endpoint).WithField("error", err)
 		if urlErr, ok := err.(*url.Error); ok {
-			if opErr, ok := urlErr.Unwrap().(*net.OpError); ok {
-				if opErr.Timeout() {
+			if urlErr.Timeout() {
+				if opErr, ok := urlErr.Unwrap().(*net.OpError); ok {
 					if opErr.Addr == nil {
 						contextLogger = contextLogger.WithField("reason", "DNS lookup timed out")
 					} else {
